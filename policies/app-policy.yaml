@@ -1,0 +1,22 @@
+# Third-party GitHub App policy, shared by all events.
+#
+# Tier = the single most dangerous thing an app asks for:
+#   reject   org-wide write, repo secrets:write, installed on "All repositories", or listed in deny
+#   review2  repo administration:write or workflows:write, or the app is owned by a personal account
+#   review1  any other repo write (contents, actions, deployments, pull_requests, ...)
+#   allow    read only
+# Approval always means "Only select repositories" -> the requesting team's repo.
+
+# Apps used a lot at hackathons. Allow-listed apps drop one tier (review2 -> review1), never out of reject.
+allow: [vercel, render, netlify]
+deny: []
+
+require_selected_repos: true   # "All repositories" installs are rejected
+allow_lowers_tier: 1
+
+deny_permissions:
+  repository: [secrets:write]
+  organization: []              # any organization-level write is rejected anyway
+
+review2_permissions:
+  repository: [administration:write, workflows:write]

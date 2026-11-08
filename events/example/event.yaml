@@ -1,0 +1,69 @@
+# hackathon-ops event config.
+# Copy with the event_init tool (it fills event_id and github.org), then edit.
+# Everything an event changes lives here; the server code never changes per event.
+
+event_id: example            # must match the folder name: events/<event_id>/
+timezone: Asia/Seoul
+write_delay_ms: 1000         # pause between GitHub writes
+
+github:
+  org: your-hackathon-org    # a fresh org per event is recommended
+  team_name: "Team{team_no}" # e.g. "Team{team_no}{track_id}" -> Team01H when tracks share numbers
+  team_no_pad: 2             # 1 -> 01
+  invite_by_email: false     # invite people without a GitHub username by email (anyone can accept it, so off by default)
+
+roster:
+  source: google_sheets      # google_sheets | csv
+  spreadsheet_id: "<spreadsheet id from the sheet URL>"
+  # For csv, these are file paths relative to this folder instead of tab names.
+  participants_tab: 웹신청
+  assignment_tab: 팀배정       # one row per person: team number, email, role, track
+  github_ids_tab: GitHub아이디  # optional: responses of a separate "GitHub username" form
+  columns:                    # participants tab column -> field
+    email: 이메일
+    name: 성함
+    google_sub: 계정 식별자
+    # github_login: GitHub 아이디   # when the application form asks for it
+  assignment_columns:
+    team_no: 팀 번호
+    email: 이메일
+    role: 역할                 # "leader"/"조장" marks the leader, anything else is a member
+    track: 트랙
+  github_ids_columns:
+    email: 이메일 주소          # Google Forms' collected email column
+    github_login: GitHub 아이디
+
+teams:
+  size: [2, 6]
+
+tracks:                      # key = canonical name; aliases = what may appear in the sheet
+  hackathon:
+    id: H
+    aliases: [해커톤]
+    # template: your-hackathon-org/template-hackathon
+  assignment:
+    id: A
+    aliases: [구현과제, 구현 과제]
+    # template: your-hackathon-org/template-assignment
+
+repo:
+  name_pattern: "{team_name}"
+  visibility: private        # private during the event; repos_visibility makes them public afterwards
+  leader_permission: maintain
+  member_permission: push
+  ruleset:
+    enabled: true            # private repos need a paid plan for rulesets; skipped automatically otherwise
+    block_force_push: true
+    block_deletion: true
+  topics: ["{event_id}"]
+  readme_required_sections: [서비스 링크, 기술 스택, 구현한 기능, 못 한 것]
+
+reviewers:                   # mentors and judges: read-only, outside collaborators, never org members
+  tab: 심사멘토                # columns: 이름, GitHub 아이디, 역할 (mentor/멘토, judge/심사위원), 담당 팀 ("01, 03")
+  expires_at: "2026-12-31T18:00:00+09:00"
+
+schedule:
+  start_at: "2026-12-31T09:00:00+09:00"
+  freeze_at: "2027-01-01T10:00:00+09:00"
+
+app_policy: ../../policies/app-policy.yaml
