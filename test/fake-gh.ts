@@ -85,8 +85,20 @@ export class FakeGh implements GhApi {
     return r;
   }
 
+  without2fa: string[] = [];
+
   async getOrg() {
     return this.orgInfo;
+  }
+  async updateOrg(patch: Record<string, unknown>) {
+    this.hit("updateOrg");
+    Object.assign(this.orgInfo, patch);
+  }
+  async listMembersWithout2fa() {
+    return [...this.without2fa];
+  }
+  async listOutsideCollaboratorsWithout2fa() {
+    return [];
   }
   async ownInstallationPermissions() {
     return { members: "write", organization_administration: "read", administration: "write", contents: "write", metadata: "read" };

@@ -12,7 +12,15 @@ export interface OrgInfo {
   members_can_create_repositories?: boolean | null;
   members_can_create_public_repositories?: boolean | null;
   two_factor_requirement_enabled?: boolean | null;
+  members_can_fork_private_repositories?: boolean | null;
   plan?: string | null;
+}
+
+/** Org settings this server can change through the API. 2FA enforcement is not one of them (UI only). */
+export interface OrgSettingsPatch {
+  members_can_create_repositories?: boolean;
+  default_repository_permission?: "none" | "read" | "write" | "admin";
+  members_can_fork_private_repositories?: boolean;
 }
 
 export interface TeamInfo {
@@ -72,6 +80,10 @@ export interface GhApi {
   readonly authMode: "app" | "token";
 
   getOrg(): Promise<OrgInfo>;
+  updateOrg(patch: OrgSettingsPatch): Promise<void>;
+  /** Logins without 2FA (owner-only filter on GitHub). */
+  listMembersWithout2fa(): Promise<string[]>;
+  listOutsideCollaboratorsWithout2fa(): Promise<string[]>;
   /** Permissions granted to this server's own GitHub App installation (null in token mode). */
   ownInstallationPermissions(): Promise<Record<string, string> | null>;
 

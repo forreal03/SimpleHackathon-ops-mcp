@@ -42,7 +42,7 @@ export async function createPlan<I>(ctx: Ctx, kind: PlanKind<I>, input: I) {
   const base = { kind: kind.kind, warnings: result.warnings, ...(result.info ? { info: result.info } : {}) };
 
   if (result.changes.length === 0) {
-    return { ...base, plan_id: null, message: "Nothing to change. GitHub already matches the desired state.", changes: [] };
+    return { ...base, plan_id: null, message: "Nothing to change through the API.", changes: [] };
   }
 
   const plan = {

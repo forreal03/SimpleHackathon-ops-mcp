@@ -14,7 +14,8 @@ import { visibilityPlan } from "./plans/visibility.js";
 import { reviewersPlan } from "./plans/reviewers.js";
 import { closePlan } from "./plans/close.js";
 import { appsDrift, decideApp, ingestRequests, listApps, reviewApp } from "./ops/apps.js";
-import { eventInit, githubHandlesCheck, orgCheck, reposActivity, rosterSync, teamsList } from "./ops/read.js";
+import { eventInit, githubHandlesCheck, orgCheck, reposActivity, rosterSources, rosterSync, teamsList } from "./ops/read.js";
+import { orgSettingsPlan } from "./plans/orgsettings.js";
 
 export const VERSION = "0.1.0";
 
@@ -22,7 +23,7 @@ const INSTRUCTIONS = `hackathon-ops manages one GitHub organization per hackatho
 
 Every tool except event_init takes "event": the folder name under events/ that holds event.yaml.
 
-Typical order: event_init -> org_check -> roster_sync (repeat until no errors) -> github_handles_check
+Typical order: event_init -> org_check -> org_settings_plan/apply -> roster_sources -> roster_sync (repeat until no errors) -> github_handles_check
 -> teams_plan/teams_apply -> repos_plan/repos_apply -> reviewers_plan/reviewers_apply
 -> during the event: app_requests_ingest, app_review, app_decide, apps_drift
 -> at the deadline: repos_freeze, repos_visibility_plan/apply -> after judging: repos_freeze(archive), reviewers revoke, event_close.
@@ -162,7 +163,38 @@ export function createServer(): McpServer {
     async (a) => orgCheck(await ctxFor(a.event)),
   );
 
+  planPair(
+    "org_settings",
+    "Org settings",
+    orgSettingsPlan,
+    "Plans org setting changes GitHub allows through the API: members_can_create_repositories, default_repository_permission, members_can_fork_private_repositories. With require_two_factor it also reports 2FA enforcement: GitHub has no API for that switch, so the plan lists exactly who would be removed from the org and links the setting for a person to flip.",
+    {
+      members_can_create_repositories: z.boolean().optional(),
+      default_repository_permission: z.enum(["none", "read", "write", "admin"]).optional(),
+      members_can_fork_private_repositories: z.boolean().optional(),
+      require_two_factor: z.boolean().optional().describe("Report what turning 2FA enforcement on/off would do."),
+    },
+    (a) => ({
+      members_can_create_repositories: a.members_can_create_repositories as boolean | undefined,
+      default_repository_permission: a.default_repository_permission as "none" | "read" | "write" | "admin" | undefined,
+      members_can_fork_private_repositories: a.members_can_fork_private_repositories as boolean | undefined,
+      require_two_factor: a.require_two_factor as boolean | undefined,
+    }),
+    false,
+  );
+
   // ---------------------------------------------------------------- roster
+  tool(
+    "roster_sources",
+    {
+      title: "Check the roster spreadsheet",
+      description: "Opens the spreadsheet set in event.yaml (roster.spreadsheet: the Google Sheets/Drive link) read-only and reports its tabs, the columns of each configured tab, what is missing, and which service account to share it with.",
+      input: { event: eventArg },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async (a) => rosterSources(await ctxFor(a.event, false)),
+  );
+
   tool(
     "roster_sync",
     {

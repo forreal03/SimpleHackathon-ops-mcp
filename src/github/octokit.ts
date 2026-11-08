@@ -13,6 +13,7 @@ import {
   type Installation,
   type Invitation,
   type OrgInfo,
+  type OrgSettingsPatch,
   type RepoInfo,
   type RepoPermission,
   type TeamInfo,
@@ -116,8 +117,23 @@ export class OctokitGh implements GhApi {
       members_can_create_repositories: (d.members_can_create_repositories as boolean) ?? null,
       members_can_create_public_repositories: (d.members_can_create_public_repositories as boolean) ?? null,
       two_factor_requirement_enabled: (d.two_factor_requirement_enabled as boolean) ?? null,
+      members_can_fork_private_repositories: (d.members_can_fork_private_repositories as boolean) ?? null,
       plan: d.plan?.name ?? null,
     };
+  }
+
+  async updateOrg(patch: OrgSettingsPatch) {
+    await this.kit.request("PATCH /orgs/{org}", { org: this.org, ...patch });
+  }
+
+  async listMembersWithout2fa() {
+    const users = await this.kit.paginate("GET /orgs/{org}/members", { org: this.org, filter: "2fa_disabled", per_page: 100 });
+    return users.map((u) => u.login);
+  }
+
+  async listOutsideCollaboratorsWithout2fa() {
+    const users = await this.kit.paginate("GET /orgs/{org}/outside_collaborators", { org: this.org, filter: "2fa_disabled", per_page: 100 });
+    return users.map((u) => u.login);
   }
 
   async ownInstallationPermissions() {

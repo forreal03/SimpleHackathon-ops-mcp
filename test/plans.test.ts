@@ -6,6 +6,9 @@ import { freezePlan } from "../src/plans/freeze.js";
 import { visibilityPlan } from "../src/plans/visibility.js";
 import { reviewersPlan } from "../src/plans/reviewers.js";
 import { closePlan } from "../src/plans/close.js";
+import { orgSettingsPlan } from "../src/plans/orgsettings.js";
+import { loadRoster } from "../src/roster/roster.js";
+import { TabMissingError } from "../src/roster/sources.js";
 import { makeCtx } from "./helpers.js";
 
 type Planned = { plan_id: string; confirm_code: string; changes: { op: string; target: string }[]; warnings: string[]; info?: Record<string, unknown> };
@@ -199,6 +202,46 @@ describe("reviewers", () => {
     team01.collaborators.set("mentor-gh", "pull");
     const r = await plan(ctx, reviewersPlan, { action: "revoke" });
     expect(r.changes.map((c) => `${c.op} ${c.target}`)).toEqual(["remove_collaborator repo:Team01/user:mentor-gh", "delete_invitation repo:Team02/invitation:judge-gh"]);
+  });
+});
+
+describe("roster before teams exist", () => {
+  it("reports participants when the assignment tab is not there yet, and blocks team plans", async () => {
+    const { ctx, tables } = await makeCtx();
+    const read = ctx.read!;
+    ctx.read = async (name) => {
+      if (name === "assignment" || name === "github_ids") throw new TabMissingError(name, "missing");
+      return read(name);
+    };
+    delete tables.assignment;
+    const roster = await loadRoster(ctx.ev, ctx.read);
+    expect(roster.registered).toBe(5);
+    expect(roster.teams).toEqual([]);
+    expect(roster.problems.map((p) => p.kind)).toEqual(["assignment_tab_missing", "github_ids_tab_missing"]);
+    await expect(createPlan(ctx, teamsPlan, {})).rejects.toThrow(/no "assignment" tab yet/);
+  });
+});
+
+describe("org settings", () => {
+  it("changes API settings and reports who 2FA enforcement would remove", async () => {
+    const { ctx, gh } = await makeCtx();
+    gh.orgInfo.members_can_create_repositories = true;
+    gh.orgInfo.two_factor_requirement_enabled = false;
+    gh.without2fa = ["no2fa-a", "no2fa-b"];
+
+    const p = await plan(ctx, orgSettingsPlan, { members_can_create_repositories: false, default_repository_permission: "none", require_two_factor: true });
+    expect(p.changes.map((c) => c.summary)).toEqual(["members_can_create_repositories: true -> false"]);
+    const tfa = p.info?.two_factor as { members_without_2fa: string[]; effect: string; how: string };
+    expect(tfa.members_without_2fa).toEqual(["no2fa-a", "no2fa-b"]);
+    expect(tfa.effect).toMatch(/REMOVES these 2 people/);
+    expect(tfa.how).toMatch(/no API/);
+
+    await applyPlan(ctx, orgSettingsPlan, p.plan_id, p.confirm_code);
+    expect(gh.orgInfo.members_can_create_repositories).toBe(false);
+
+    const only2fa = await createPlan(ctx, orgSettingsPlan, { require_two_factor: false });
+    expect(only2fa.plan_id).toBeNull();
+    expect((only2fa as { info?: { two_factor: { effect: string } } }).info?.two_factor.effect).toMatch(/Already not required/);
   });
 });
 

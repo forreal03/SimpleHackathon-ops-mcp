@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { maskEmail, normLogin, normTeamNo, patternToRegExp, sha256 } from "../src/lib/util.js";
 import { parseCsv } from "../src/roster/csv.js";
 import { checkReadme, findSecretFiles } from "../src/repos/checks.js";
-import { parseEventYaml } from "../src/config/load.js";
+import { parseEventYaml, spreadsheetIdFrom } from "../src/config/load.js";
 import { EVENT_YAML } from "./helpers.js";
 
 describe("util", () => {
@@ -62,6 +62,22 @@ describe("pre-publish checks", () => {
   });
 });
 
+describe("spreadsheet links", () => {
+  const id = "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-xy";
+  it("takes the ID from any link Drive or Sheets gives you", () => {
+    expect(spreadsheetIdFrom(`https://docs.google.com/spreadsheets/d/${id}/edit?usp=drivesdk&ouid=1`)).toBe(id);
+    expect(spreadsheetIdFrom(`https://drive.google.com/file/d/${id}/view`)).toBe(id);
+    expect(spreadsheetIdFrom(`https://drive.google.com/open?id=${id}`)).toBe(id);
+    expect(spreadsheetIdFrom(id)).toBe(id);
+    expect(spreadsheetIdFrom("https://drive.google.com/drive/folders/short")).toBeNull();
+  });
+
+  it("accepts the link in event.yaml", () => {
+    const yaml = EVENT_YAML.replace("source: csv", `source: google_sheets\n  spreadsheet: "https://docs.google.com/spreadsheets/d/${id}/edit"`);
+    expect(parseEventYaml(yaml).roster.spreadsheet_id).toBe(id);
+  });
+});
+
 describe("config", () => {
   it("parses the test event and applies defaults", () => {
     const cfg = parseEventYaml(EVENT_YAML);
@@ -73,7 +89,7 @@ describe("config", () => {
     expect(() => parseEventYaml(EVENT_YAML.replace("tab: reviewers", "tab: reviewers\n  permission: push"))).toThrow(/reviewers.permission/);
   });
 
-  it("requires spreadsheet_id for google_sheets", () => {
-    expect(() => parseEventYaml(EVENT_YAML.replace("source: csv", "source: google_sheets"))).toThrow(/spreadsheet_id/);
+  it("requires the sheet link for google_sheets", () => {
+    expect(() => parseEventYaml(EVENT_YAML.replace("source: csv", "source: google_sheets"))).toThrow(/roster.spreadsheet/);
   });
 });

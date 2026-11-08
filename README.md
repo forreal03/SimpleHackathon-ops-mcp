@@ -49,7 +49,7 @@ GitHub → Settings → Developer settings → GitHub Apps → New GitHub App
   | 범위 | 권한 | 쓰는 곳 |
   | --- | --- | --- |
   | Organization → Members | Read and write | 팀 생성, 초대, 팀 배정 |
-  | Organization → Administration | Read-only | 설치된 앱 목록 |
+  | Organization → Administration | Read-only (`org_settings_apply`를 쓰려면 Read and write) | 설치된 앱 목록, org 설정 |
   | Repository → Administration | Read and write | repo 생성, 팀·협업자 권한, ruleset, 공개 전환, 보관 |
   | Repository → Contents | Read and write | 제출 태그, README·파일 목록·커밋 읽기 |
   | Repository → Metadata | Read-only | 기본 |
@@ -57,13 +57,29 @@ GitHub → Settings → Developer settings → GitHub Apps → New GitHub App
 - Private key를 만들어 안전한 곳에 저장하고, App ID를 적어 둡니다.
 - 대회 org에 설치합니다. 이 앱은 모든 repo를 관리해야 하므로 **All repositories**로 설치합니다. 이 앱 자신은 앱 정책 점검에서 빠집니다.
 
+**어디에 만드나?** 비공개(private) GitHub App은 그 앱을 소유한 계정에만 설치할 수 있습니다. 그래서 둘 중 하나를 고릅니다.
+
+- 대회 org 안에서 만든다(org Settings → Developer settings → GitHub Apps). 대회마다 새로 만들지만 범위가 가장 좁습니다.
+- 개인 계정에 하나 만들고 **public**으로 둔다. 여러 대회 org에 같은 앱을 설치할 수 있습니다. 다른 사람이 설치해도 private key 없이는 아무것도 할 수 없습니다.
+
+MCP 서버 자체는 org에 등록하지 않습니다. 서버는 운영진 PC에서 돌고(아래 4번), org에는 이 GitHub App만 설치합니다.
+
 시험해 볼 때는 GitHub App 대신 `GITHUB_TOKEN`(테스트 org의 owner 토큰)도 됩니다.
 
-### 3. Google 서비스 계정
+### 3. 명단 시트 지정과 Google 인증
 
-1. Google Cloud에서 프로젝트를 만들고 **Google Sheets API**를 켭니다.
-2. 서비스 계정을 만들고 JSON 키를 받습니다.
-3. 참가자 스프레드시트를 그 서비스 계정 이메일에 **뷰어**로 공유합니다.
+`event.yaml`의 `roster.spreadsheet`에 Drive나 브라우저에서 복사한 **시트 링크**를 그대로 넣습니다.
+`roster_sources` 툴이 그 시트의 탭과 열을 읽어, 설정과 무엇이 다른지와 누구에게 공유해야 하는지 알려 줍니다.
+
+서버가 시트를 읽는 방법은 둘 중 하나입니다(둘 다 읽기 전용 `spreadsheets.readonly`).
+
+- **서비스 계정(권장)**: Google Cloud 프로젝트에서 **Google Sheets API**를 켜고 서비스 계정 JSON 키를 받아 `GOOGLE_APPLICATION_CREDENTIALS`에 지정합니다. 시트를 그 서비스 계정 이메일(`roster_sources`가 알려 줌)에 **뷰어**로 공유합니다.
+- **내 구글 계정**: gcloud CLI로 한 번 로그인하면 공유 없이 내가 열 수 있는 시트를 읽습니다.
+
+  ```bash
+  gcloud auth application-default login \
+    --scopes=https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/spreadsheets.readonly
+  ```
 
 CSV로 운영하면 이 단계는 필요 없습니다(`roster.source: csv`).
 
@@ -143,6 +159,8 @@ claude mcp add hackathon-ops \
 | 시점 | 말하기 예시 | 툴 |
 | --- | --- | --- |
 | 준비 | "org 설정 점검해줘" | `org_check` |
+| 준비 | "멤버 repo 생성 꺼줘", "2FA 강제하면 누가 빠져?" | `org_settings_plan` → `org_settings_apply` |
+| 준비 | "시트 연결 확인해줘" | `roster_sources` |
 | 준비 | "명단 확인해줘" | `roster_sync`(문제가 0이 될 때까지), `github_handles_check` |
 | 대회 전 | "팀 만들고 초대해줘" | `teams_plan` → 확인 → `teams_apply` |
 | 대회 전 | "팀별 repo 만들어줘" | `repos_plan` → `repos_apply` |
@@ -182,6 +200,7 @@ Gmail 커넥터가 연결된 클라이언트에서 "앱 요청 확인해줘"라�
 
 ## 알아 둘 점
 
+- **2FA 강제**: GitHub API로는 켜고 끌 수 없어 사람이 설정 화면에서 바꿉니다. 켜는 순간 2FA가 없는 멤버와 협업자는 org에서 **빠집니다**. `org_settings_plan`에 `require_two_factor: true`를 주면 빠질 사람 목록과 설정 링크를 보여 줍니다. 참가자를 초대하기 전에 정하세요.
 - **Rulesets**: 무료 org의 private repo에는 ruleset을 걸 수 없습니다. 이 경우 자동으로 건너뛰고 경고만 남깁니다.
 - **마감 후 앱 push**: 팀 권한을 낮춰도 설치된 앱은 push할 수 있습니다. 그래서 심사는 항상 제출 태그 기준이고, 완전히 막으려면 보관(archive)합니다.
 - **커밋 시각**: `repos_activity`의 시각은 커밋한 사람이 정할 수 있어 위조가 가능합니다. 판정이 아니라 참고 자료입니다.

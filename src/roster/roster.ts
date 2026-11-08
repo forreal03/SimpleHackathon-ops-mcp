@@ -1,7 +1,7 @@
 import type { EventConfig } from "../config/schema.js";
 import type { LoadedEvent } from "../config/load.js";
 import { fill, maskEmail, normEmail, normLogin, normTeamNo } from "../lib/util.js";
-import { requireColumns, tableReader, type Table, type TableReader } from "./sources.js";
+import { requireColumns, tableReader, TabMissingError, type Table, type TableReader } from "./sources.js";
 
 export type Role = "leader" | "member";
 
@@ -33,9 +33,13 @@ export interface Problem {
 }
 
 export interface Roster {
+  /** People on a team. */
   people: Person[];
   teams: Team[];
   problems: Problem[];
+  /** Everyone in the participants tab, assigned or not. */
+  registered: number;
+  registered_with_github_login: number;
 }
 
 export interface Reviewer {
@@ -264,7 +268,7 @@ export function buildRoster(cfg: EventConfig, t: RosterTables): Roster {
     });
   }
 
-  return { people: assigned, teams, problems };
+  return { people: assigned, teams, problems, registered: people.length, registered_with_github_login: people.filter((p) => p.github_login).length };
 }
 
 export function buildReviewers(cfg: EventConfig, table: Table, teams: Team[]): { reviewers: Reviewer[]; problems: Problem[] } {
@@ -311,12 +315,34 @@ export function buildReviewers(cfg: EventConfig, table: Table, teams: Team[]): {
 /** Reads the configured tabs and builds the roster. */
 export async function loadRoster(ev: LoadedEvent, read: TableReader = tableReader(ev)): Promise<Roster> {
   const r = ev.cfg.roster;
-  const [participants, assignment, githubIds] = await Promise.all([
-    read(r.participants_tab),
-    read(r.assignment_tab),
-    r.github_ids_tab ? read(r.github_ids_tab) : Promise.resolve(undefined),
-  ]);
-  return buildRoster(ev.cfg, { participants, assignment, githubIds });
+  const optional = async (tab?: string): Promise<Table | null | undefined> => {
+    if (!tab) return undefined;
+    try {
+      return await read(tab);
+    } catch (err) {
+      if (err instanceof TabMissingError) return null;
+      throw err;
+    }
+  };
+  const [participants, assignment, githubIds] = await Promise.all([read(r.participants_tab), optional(r.assignment_tab), optional(r.github_ids_tab)]);
+
+  // A missing assignment tab is normal before teams are formed: still report on the participants.
+  const ac = r.assignment_columns;
+  const empty: Table = { name: r.assignment_tab, headers: [ac.team_no, ac.email, ac.role, ac.track, ac.github_login].filter((c): c is string => !!c), rows: [] };
+  const roster = buildRoster(ev.cfg, { participants, assignment: assignment ?? empty, githubIds: githubIds ?? undefined });
+
+  if (assignment === null) {
+    roster.problems = roster.problems.filter((p) => p.kind !== "unassigned");
+    roster.problems.unshift({
+      kind: "assignment_tab_missing",
+      severity: "error",
+      message: `The spreadsheet has no "${r.assignment_tab}" tab yet. Add it (one row per person: ${[ac.team_no, ac.email, ac.role, ac.track].filter(Boolean).join(", ")}) before planning teams.`,
+    });
+  }
+  if (githubIds === null) {
+    roster.problems.push({ kind: "github_ids_tab_missing", severity: "warning", message: `No "${r.github_ids_tab}" tab; GitHub usernames come only from the other tabs.` });
+  }
+  return roster;
 }
 
 export async function loadReviewers(ev: LoadedEvent, roster: Roster, read: TableReader = tableReader(ev)) {
@@ -327,8 +353,10 @@ export async function loadReviewers(ev: LoadedEvent, roster: Roster, read: Table
 export function summarizeRoster(roster: Roster) {
   const errors = roster.problems.filter((p) => p.severity === "error");
   return {
+    registered: roster.registered,
+    registered_with_github_login: roster.registered_with_github_login,
     teams: roster.teams.length,
-    participants: roster.people.length,
+    participants_on_teams: roster.people.length,
     with_github_login: roster.people.filter((p) => p.github_login).length,
     problems: roster.problems,
     ready_for_teams_plan: errors.length === 0,

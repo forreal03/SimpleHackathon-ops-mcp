@@ -1,10 +1,10 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
-import { homeDir, eventDir, loadEvent, parseEventYaml } from "../config/load.js";
+import { homeDir, eventDir, loadEvent } from "../config/load.js";
 import { packageRoot } from "../paths.js";
 import { display, loadRoster, summarizeRoster } from "../roster/roster.js";
-import { tableReader } from "../roster/sources.js";
+import { describeSources, tableReader } from "../roster/sources.js";
 import { patternToRegExp, UserError } from "../lib/util.js";
 import { errorMessage } from "../github/api.js";
 import type { Ctx } from "../plans/engine.js";
@@ -18,9 +18,18 @@ export function eventInit(args: { event_id: string; org: string; overwrite?: boo
   const file = path.join(dir, "event.yaml");
   const created: string[] = [];
 
+  const validate = () => {
+    try {
+      loadEvent(args.event_id);
+      return { valid: true as const };
+    } catch (err) {
+      if (err instanceof UserError) return { valid: false as const, to_fix: err.message };
+      throw err;
+    }
+  };
+
   if (existsSync(file) && !args.overwrite) {
-    const ev = loadEvent(args.event_id); // validates
-    return { status: "exists", file, valid: true, org: ev.cfg.github.org, next: "Edit event.yaml, then run org_check and roster_sync." };
+    return { status: "exists", file, ...validate(), next: "Edit event.yaml, then run org_check and roster_sources." };
   }
 
   const doc = YAML.parseDocument(readFileSync(path.join(packageRoot(), "events", "example", "event.yaml"), "utf8"));
@@ -37,11 +46,11 @@ export function eventInit(args: { event_id: string; org: string; overwrite?: boo
     created.push(policy);
   }
 
-  parseEventYaml(readFileSync(file, "utf8"), file);
   return {
     status: "created",
     created,
-    next: "Fill in roster.spreadsheet_id, tab names, the column mapping and track templates in event.yaml. Share the sheet with the service account as Viewer. Then run org_check.",
+    ...validate(),
+    next: "Put the sheet's link in roster.spreadsheet, then the tab names, column mapping and track templates. Run roster_sources to check the sheet, then org_check.",
   };
 }
 
@@ -66,7 +75,19 @@ export async function orgCheck(ctx: Ctx) {
   const info = await ctx.gh.getOrg();
   add("default_repository_permission", info.default_repository_permission === "none", info.default_repository_permission, `Set Base permissions to "No permission" so teams cannot read each other's repos: https://github.com/organizations/${org}/settings/member_privileges`);
   add("members_can_create_repositories", info.members_can_create_repositories === false, info.members_can_create_repositories, "Turn off repository creation for members so all repos are created by this server.");
-  add("two_factor_requirement_enabled", info.two_factor_requirement_enabled ?? null, info.two_factor_requirement_enabled, "Not visible to the app, or off. Requiring 2FA protects team repos; check https://github.com/organizations/" + org + "/settings/security");
+  let without2fa: number | null = null;
+  try {
+    without2fa = (await ctx.gh.listMembersWithout2fa()).length;
+  } catch {
+    // owner-only on GitHub; leave unknown
+  }
+  add(
+    "two_factor_requirement_enabled",
+    info.two_factor_requirement_enabled ?? null,
+    { required: info.two_factor_requirement_enabled, members_without_2fa: without2fa },
+    `Off or not visible. Turning it on REMOVES every member without 2FA from the org${without2fa ? ` (${without2fa} now)` : ""}. ` +
+      `Decide before inviting participants. org_settings_plan with require_two_factor shows exactly who: https://github.com/organizations/${org}/settings/security`,
+  );
 
   const perms = await ctx.gh.ownInstallationPermissions();
   if (perms) {
@@ -96,6 +117,33 @@ export async function orgCheck(ctx: Ctx) {
 }
 
 // ---------------------------------------------------------------- roster
+
+export async function rosterSources(ctx: Ctx) {
+  const r = ctx.ev.cfg.roster;
+  const c = r.columns;
+  const a = r.assignment_columns;
+  const g = r.github_ids_columns;
+  const rv = ctx.ev.cfg.reviewers;
+  const wanted = [
+    { role: "participants", tab: r.participants_tab, columns: [c.email, c.name, c.google_sub, c.github_login] },
+    { role: "assignment", tab: r.assignment_tab, columns: [a.team_no, a.email, a.role, a.track, a.github_login] },
+    ...(r.github_ids_tab ? [{ role: "github_ids", tab: r.github_ids_tab, columns: [g.email, g.github_login] }] : []),
+    ...(rv ? [{ role: "reviewers", tab: rv.tab, columns: [rv.columns.name, rv.columns.github_login, rv.columns.role, rv.columns.teams] }] : []),
+  ].map((w) => ({ ...w, columns: w.columns.filter((x): x is string => !!x) }));
+
+  const out = await describeSources(ctx.ev, wanted);
+  const missingTabs = out.configured.filter((t) => !t.exists).map((t) => `${t.role}: "${t.tab}"`);
+  const badColumns = out.configured.filter((t) => t.missing_columns?.length).map((t) => `${t.tab}: ${t.missing_columns!.join(", ")}`);
+  return {
+    ...out,
+    spreadsheet_url: r.source === "google_sheets" ? `https://docs.google.com/spreadsheets/d/${r.spreadsheet_id}/edit` : null,
+    ready: missingTabs.length === 0 && badColumns.length === 0,
+    to_fix: [
+      ...missingTabs.map((t) => `Tab missing (${t}). Create it or change the tab name in event.yaml.`),
+      ...badColumns.map((t) => `Columns not found in ${t}. Rename them in the sheet or fix the mapping in event.yaml.`),
+    ],
+  };
+}
 
 export async function rosterSync(ctx: Ctx) {
   const roster = await loadRoster(ctx.ev, ctx.read);

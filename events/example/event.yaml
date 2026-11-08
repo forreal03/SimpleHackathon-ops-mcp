@@ -14,7 +14,8 @@ github:
 
 roster:
   source: google_sheets      # google_sheets | csv
-  spreadsheet_id: "<spreadsheet id from the sheet URL>"
+  # The sheet's link, as copied from the browser or from Drive ("Copy link"). roster_sources checks it.
+  spreadsheet: "https://docs.google.com/spreadsheets/d/<id>/edit"
   # For csv, these are file paths relative to this folder instead of tab names.
   participants_tab: 웹신청
   assignment_tab: 팀배정       # one row per person: team number, email, role, track

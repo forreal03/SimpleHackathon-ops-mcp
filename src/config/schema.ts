@@ -18,7 +18,9 @@ export const EventConfigSchema = z.object({
 
   roster: z.object({
     source: z.enum(["google_sheets", "csv"]),
-    /** Required for google_sheets. */
+    /** Google Sheets link as copied from the browser or Drive ("Copy link"), or the bare ID. */
+    spreadsheet: z.string().optional(),
+    /** Older name for `spreadsheet`. */
     spreadsheet_id: z.string().optional(),
     /** Tab names for google_sheets, file paths (relative to the event folder) for csv. */
     participants_tab: z.string(),

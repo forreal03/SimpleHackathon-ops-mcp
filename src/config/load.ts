@@ -30,12 +30,27 @@ function formatZodError(file: string, issues: { path: PropertyKey[]; message: st
   return `${file} is invalid:\n` + issues.map((i) => `  - ${i.path.map(String).join(".") || "(root)"}: ${i.message}`).join("\n");
 }
 
+/**
+ * Accepts https://docs.google.com/spreadsheets/d/<id>/edit..., https://drive.google.com/file/d/<id>/view,
+ * https://drive.google.com/open?id=<id>, or the bare ID.
+ */
+export function spreadsheetIdFrom(value: string): string | null {
+  const v = value.trim();
+  const m = v.match(/\/(?:spreadsheets\/d|file\/d)\/([A-Za-z0-9_-]{20,})/) ?? v.match(/[?&]id=([A-Za-z0-9_-]{20,})/);
+  if (m?.[1]) return m[1];
+  return /^[A-Za-z0-9_-]{20,}$/.test(v) ? v : null;
+}
+
 export function parseEventYaml(text: string, file = "event.yaml"): EventConfig {
   const parsed = EventConfigSchema.safeParse(YAML.parse(text));
   if (!parsed.success) throw new UserError(formatZodError(file, parsed.error.issues));
   const cfg = parsed.data;
-  if (cfg.roster.source === "google_sheets" && !cfg.roster.spreadsheet_id) {
-    throw new UserError(`${file}: roster.spreadsheet_id is required when roster.source is google_sheets.`);
+  if (cfg.roster.source === "google_sheets") {
+    const raw = cfg.roster.spreadsheet ?? cfg.roster.spreadsheet_id;
+    if (!raw) throw new UserError(`${file}: roster.spreadsheet (the sheet's link) is required when roster.source is google_sheets.`);
+    const id = spreadsheetIdFrom(raw);
+    if (!id) throw new UserError(`${file}: roster.spreadsheet "${raw}" is not a Google Sheets link or ID.`);
+    cfg.roster.spreadsheet_id = id;
   }
   if (cfg.teams.size[0] > cfg.teams.size[1]) throw new UserError(`${file}: teams.size must be [min, max].`);
   return cfg;
