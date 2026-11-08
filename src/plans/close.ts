@@ -7,6 +7,7 @@ export const closePlan: PlanKind<Record<string, never>> = {
 
   async compute(ctx) {
     const counts = ctx.db.personalDataCounts();
+    const frozen = counts.freeze_snapshot_rows > 0 ? ["Saved pre-freeze permissions are deleted too, so repos still frozen cannot be unfrozen with repos_freeze afterwards."] : [];
     return {
       changes: [
         {
@@ -19,6 +20,7 @@ export const closePlan: PlanKind<Record<string, never>> = {
       warnings: [
         "This is local only. Delete the participant spreadsheet and the GitHub ID form responses separately, as your privacy notice says.",
         "Team, repo and app decision records stay so the event can still be audited.",
+        ...frozen,
       ],
       info: { counts },
     };

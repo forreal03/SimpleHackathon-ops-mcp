@@ -41,10 +41,14 @@ tracks:                      # key = canonical name; aliases = what may appear i
   hackathon:
     id: H
     aliases: [해커톤]
+    teams: ["11-20"]          # which team numbers are in this track (lets repo tools work without a roster)
+    freeze_at: "2027-01-01T10:00:00+09:00"   # per-track deadline (falls back to schedule.freeze_at)
     # template: your-hackathon-org/template-hackathon
   assignment:
     id: A
     aliases: [구현과제, 구현 과제]
+    teams: ["01-10"]
+    freeze_at: "2027-01-01T09:00:00+09:00"
     # template: your-hackathon-org/template-assignment
 
 repo:
@@ -59,12 +63,14 @@ repo:
   topics: ["{event_id}"]
   readme_required_sections: [서비스 링크, 기술 스택, 구현한 기능, 못 한 것]
 
-reviewers:                   # mentors and judges: read-only, outside collaborators, never org members
-  tab: 심사멘토                # columns: 이름, GitHub 아이디, 역할 (mentor/멘토, judge/심사위원), 담당 팀 ("01, 03")
+reviewers:                   # mentors and judges are registered with reviewer_set (read-only, private repos only)
   expires_at: "2026-12-31T18:00:00+09:00"
 
-schedule:
+schedule:                    # schedule_get / schedule_set change these without editing by hand
   start_at: "2026-12-31T09:00:00+09:00"
+  prep_enabled: false          # true: commits from prep_from until start_at are allowed (not flagged)
+  # prep_from: "2026-12-20T00:00:00+09:00"
+  freeze_enabled: true         # false: no late-push checks (locking still works); tracks can override
   freeze_at: "2027-01-01T10:00:00+09:00"
 
 app_policy: ../../policies/app-policy.yaml

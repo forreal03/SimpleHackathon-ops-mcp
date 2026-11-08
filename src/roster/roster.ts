@@ -42,14 +42,6 @@ export interface Roster {
   registered_with_github_login: number;
 }
 
-export interface Reviewer {
-  name: string;
-  github_login: string;
-  role: "mentor" | "judge";
-  /** Team numbers, or "all" for judges with no assignment. */
-  teams: string[] | "all";
-}
-
 /** Who a person is in tool output: never the raw email. */
 export const display = (p: Pick<Person, "name" | "email">) => p.name || maskEmail(p.email);
 
@@ -271,47 +263,6 @@ export function buildRoster(cfg: EventConfig, t: RosterTables): Roster {
   return { people: assigned, teams, problems, registered: people.length, registered_with_github_login: people.filter((p) => p.github_login).length };
 }
 
-export function buildReviewers(cfg: EventConfig, table: Table, teams: Team[]): { reviewers: Reviewer[]; problems: Problem[] } {
-  if (!cfg.reviewers) return { reviewers: [], problems: [] };
-  const c = cfg.reviewers.columns;
-  requireColumns(table, [c.name, c.github_login, c.role, c.teams]);
-  const known = new Set(teams.map((t) => t.team_no));
-  const reviewers: Reviewer[] = [];
-  const problems: Problem[] = [];
-
-  for (const row of table.rows) {
-    const name = row[c.name] ?? "";
-    const rawLogin = row[c.github_login] ?? "";
-    if (!name && !rawLogin) continue;
-    const login = normLogin(rawLogin);
-    if (!login) {
-      problems.push({ kind: "reviewer_login", severity: "error", message: `Reviewer ${name || "(no name)"} has no valid GitHub username.` });
-      continue;
-    }
-    const roleRaw = row[c.role] ?? "";
-    const role = /mentor|멘토/i.test(roleRaw) ? "mentor" : /judge|심사/i.test(roleRaw) ? "judge" : null;
-    if (!role) {
-      problems.push({ kind: "reviewer_role", severity: "error", message: `Reviewer ${name}: role must be mentor/멘토 or judge/심사위원.` });
-      continue;
-    }
-    const teamNos = (row[c.teams] ?? "")
-      .split(/[,\s/]+/)
-      .filter(Boolean)
-      .map((x) => normTeamNo(x, cfg.github.team_no_pad));
-    const unknown = teamNos.filter((n) => !known.has(n));
-    if (unknown.length) {
-      problems.push({ kind: "reviewer_unknown_team", severity: "error", message: `Reviewer ${name}: unknown team(s) ${unknown.join(", ")}.` });
-      continue;
-    }
-    if (role === "mentor" && teamNos.length === 0) {
-      problems.push({ kind: "mentor_without_team", severity: "error", message: `Mentor ${name} has no assigned team. Mentors only see their own teams.` });
-      continue;
-    }
-    reviewers.push({ name, github_login: login, role, teams: teamNos.length ? teamNos : "all" });
-  }
-  return { reviewers, problems };
-}
-
 /** Reads the configured tabs and builds the roster. */
 export async function loadRoster(ev: LoadedEvent, read: TableReader = tableReader(ev)): Promise<Roster> {
   const r = ev.cfg.roster;
@@ -343,11 +294,6 @@ export async function loadRoster(ev: LoadedEvent, read: TableReader = tableReade
     roster.problems.push({ kind: "github_ids_tab_missing", severity: "warning", message: `No "${r.github_ids_tab}" tab; GitHub usernames come only from the other tabs.` });
   }
   return roster;
-}
-
-export async function loadReviewers(ev: LoadedEvent, roster: Roster, read: TableReader = tableReader(ev)) {
-  if (!ev.cfg.reviewers) return { reviewers: [], problems: [{ kind: "no_reviewers_config", severity: "error" as const, message: "event.yaml has no reviewers section." }] };
-  return buildReviewers(ev.cfg, await read(ev.cfg.reviewers.tab), roster.teams);
 }
 
 export function summarizeRoster(roster: Roster) {

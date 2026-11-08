@@ -22,12 +22,10 @@ roster:
 teams:
   size: [2, 4]
 tracks:
-  hackathon: { id: H, aliases: [해커톤], template: test-org/tpl-hackathon }
-  assignment: { id: A, aliases: [구현과제] }
+  hackathon: { id: H, aliases: [해커톤], template: test-org/tpl-hackathon, teams: ["01"], freeze_at: "2026-11-14T10:00:00+09:00" }
+  assignment: { id: A, aliases: [구현과제], teams: ["02"], freeze_at: "2026-11-14T09:00:00+09:00" }
 repo:
   readme_required_sections: [서비스 링크, 기술 스택]
-reviewers:
-  tab: reviewers
 schedule:
   start_at: "2026-11-13T19:00:00+09:00"
   freeze_at: "2026-11-14T10:00:00+09:00"
@@ -63,11 +61,6 @@ export function defaultTables(): Record<string, Table> {
       ["carol@x.com", "@carol-gh"],
       ["dave@x.com", "dave-gh"],
       ["erin@x.com", "erin-gh"],
-    ]),
-    reviewers: table("reviewers", [
-      ["이름", "GitHub 아이디", "역할", "담당 팀"],
-      ["Mentor M", "mentor-gh", "멘토", "01"],
-      ["Judge J", "judge-gh", "심사위원", ""],
     ]),
   };
 }

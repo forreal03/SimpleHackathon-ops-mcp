@@ -14,12 +14,17 @@ import {
   type Invitation,
   type OrgInfo,
   type OrgSettingsPatch,
+  type Principal,
+  type ActivityEvent,
   type RepoInfo,
   type RepoPermission,
   type TeamInfo,
 } from "./api.js";
 
 const Kit = Octokit.plugin(retry, throttling);
+
+// Expected 404s (e.g. "does this tag exist?") are handled in code; keep Octokit's request log off stderr.
+const log = { debug: () => {}, info: () => {}, warn: (m: string) => console.error(`[hackathon-ops] ${m}`), error: () => {} };
 type Kit = InstanceType<typeof Kit>;
 
 const throttle = {
@@ -58,7 +63,7 @@ async function connect(org: string): Promise<OctokitGh> {
   const userAgent = "hackathon-ops-mcp";
 
   if (appId && key) {
-    const app = new Kit({ authStrategy: createAppAuth, auth: { appId, privateKey: key }, throttle, userAgent });
+    const app = new Kit({ authStrategy: createAppAuth, auth: { appId, privateKey: key }, throttle, userAgent, log });
     let installation: { id: number; permissions: Record<string, string> };
     try {
       ({ data: installation } = (await app.request("GET /orgs/{org}/installation", { org })) as {
@@ -73,12 +78,13 @@ async function connect(org: string): Promise<OctokitGh> {
       auth: { appId, privateKey: key, installationId: installation.id },
       throttle,
       userAgent,
+      log,
     });
     return new OctokitGh(kit, org, "app", installation.permissions);
   }
 
   if (process.env.GITHUB_TOKEN) {
-    return new OctokitGh(new Kit({ auth: process.env.GITHUB_TOKEN, throttle, userAgent }), org, "token", null);
+    return new OctokitGh(new Kit({ auth: process.env.GITHUB_TOKEN, throttle, userAgent, log }), org, "token", null);
   }
 
   throw new UserError("No GitHub credentials. Set GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY_PATH (or GITHUB_TOKEN for testing).");
@@ -196,6 +202,54 @@ export class OctokitGh implements GhApi {
     await this.kit.request("POST /orgs/{org}/invitations", { org: this.org, ...target, role: "direct_member", team_ids: teamIds });
   }
 
+  async listOrgRepos(): Promise<RepoInfo[]> {
+    const repos = await this.kit.paginate("GET /orgs/{org}/repos", { org: this.org, type: "all", per_page: 100 });
+    return repos.map((d) => ({
+      name: d.name,
+      full_name: d.full_name,
+      html_url: d.html_url,
+      private: d.private,
+      visibility: d.visibility ?? (d.private ? "private" : "public"),
+      archived: !!d.archived,
+      default_branch: d.default_branch ?? "main",
+    }));
+  }
+
+  async listOrgOwners() {
+    const users = await this.kit.paginate("GET /orgs/{org}/members", { org: this.org, role: "admin", per_page: 100 });
+    return users.map((u) => u.login);
+  }
+
+  async listRepoTeams(repo: string): Promise<Principal[]> {
+    const teams = await this.kit.paginate("GET /repos/{owner}/{repo}/teams", { ...this.repo(repo), per_page: 100 });
+    return teams.map((t) => ({ id: t.slug, name: t.name, permission: normalizeRole((t as { role_name?: string }).role_name ?? t.permission) ?? "pull" }));
+  }
+
+  async listDirectCollaborators(repo: string): Promise<Principal[]> {
+    const users = await this.kit.paginate("GET /repos/{owner}/{repo}/collaborators", { ...this.repo(repo), affiliation: "direct", per_page: 100 });
+    return users.map((u) => ({ id: u.login, name: u.login, permission: normalizeRole(u.role_name) ?? "pull" }));
+  }
+
+  async updateRepoInvitation(repo: string, id: number, permission: "read" | "triage" | "write" | "maintain" | "admin") {
+    await this.kit.request("PATCH /repos/{owner}/{repo}/invitations/{invitation_id}", { ...this.repo(repo), invitation_id: id, permissions: permission });
+  }
+
+  async listRepoActivity(repo: string, max: number): Promise<ActivityEvent[]> {
+    const out: ActivityEvent[] = [];
+    try {
+      for await (const page of this.kit.paginate.iterator("GET /repos/{owner}/{repo}/activity" as never, { ...this.repo(repo), per_page: 100 } as never)) {
+        for (const a of (page as { data: { activity_type: string; timestamp: string; actor?: { login?: string } | null; ref: string }[] }).data) {
+          out.push({ type: a.activity_type, timestamp: a.timestamp, actor: a.actor?.login ?? null, ref: a.ref });
+          if (out.length >= max) return out;
+        }
+      }
+    } catch (err) {
+      if (isStatus(err, 404, 409)) return out;
+      throw err;
+    }
+    return out;
+  }
+
   async getRepo(name: string): Promise<RepoInfo | null> {
     return this.nullOn404(async () => {
       const { data } = await this.kit.request("GET /repos/{owner}/{repo}", this.repo(name));
@@ -289,7 +343,7 @@ export class OctokitGh implements GhApi {
 
   async listRepoInvitations(repo: string): Promise<Invitation[]> {
     const invs = await this.kit.paginate("GET /repos/{owner}/{repo}/invitations", { ...this.repo(repo), per_page: 100 });
-    return invs.map((i) => ({ id: i.id, login: i.invitee?.login ?? null, email: null }));
+    return invs.map((i) => ({ id: i.id, login: i.invitee?.login ?? null, email: null, permission: normalizeRole(i.permissions) }));
   }
 
   async deleteRepoInvitation(repo: string, id: number) {

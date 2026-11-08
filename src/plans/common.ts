@@ -72,6 +72,13 @@ export async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) =>
 const OP_ORDER = [
   "create_team",
   "unarchive",
+  "lower_team",
+  "lower_user",
+  "lower_invitation",
+  "restore_team",
+  "restore_user",
+  "restore_invitation",
+  "forget_snapshot",
   "remove_membership",
   "add_membership",
   "invite",

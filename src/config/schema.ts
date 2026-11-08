@@ -61,6 +61,12 @@ export const EventConfigSchema = z.object({
           .regex(/^[\w.-]+\/[\w.-]+$/, "owner/repo")
           .optional(),
         aliases: z.array(z.string()).default([]),
+        /** Team numbers in this track, e.g. ["01-10"] or ["01", "03"]. Lets repo tools work without a roster. */
+        teams: z.array(z.string().regex(/^\d+(\s*-\s*\d+)?$/, '"07" or "01-10"')).default([]),
+        /** Deadline for this track; falls back to schedule.freeze_at. */
+        freeze_at: z.string().datetime({ offset: true }).optional(),
+        /** Deadline checks for this track on/off; falls back to schedule.freeze_enabled. */
+        freeze_enabled: z.boolean().optional(),
       }),
     )
     .default({}),
@@ -93,30 +99,28 @@ export const EventConfigSchema = z.object({
       readme_required_sections: [],
     }),
 
+  /** Mentors and judges are registered with reviewer_set; this only holds the policy around them. */
   reviewers: z
     .object({
-      tab: z.string(),
-      columns: z
-        .object({
-          name: z.string().default("이름"),
-          github_login: z.string().default("GitHub 아이디"),
-          role: z.string().default("역할"),
-          teams: z.string().default("담당 팀"),
-        })
-        .default({ name: "이름", github_login: "GitHub 아이디", role: "역할", teams: "담당 팀" }),
       /** Reviewers only ever get read access. Anything else is rejected at load time. */
       permission: z.literal("pull").default("pull"),
       mode: z.literal("outside_collaborator").default("outside_collaborator"),
       expires_at: z.string().datetime({ offset: true }).optional(),
     })
-    .optional(),
+    .default({ permission: "pull", mode: "outside_collaborator" }),
 
   schedule: z
     .object({
       start_at: z.string().datetime({ offset: true }).optional(),
+      /** Preparation period on/off: commits between prep_from and start_at are allowed, not flagged. */
+      prep_enabled: z.boolean().default(false),
+      /** Start of the preparation period. Without it, everything before start_at counts as preparation. */
+      prep_from: z.string().datetime({ offset: true }).optional(),
+      /** Deadline checks on/off (late pushes etc.). Locking is always available. */
+      freeze_enabled: z.boolean().default(true),
       freeze_at: z.string().datetime({ offset: true }).optional(),
     })
-    .default({}),
+    .default({ prep_enabled: false, freeze_enabled: true }),
 
   /** Path relative to the event folder. */
   app_policy: z.string().default("../../policies/app-policy.yaml"),

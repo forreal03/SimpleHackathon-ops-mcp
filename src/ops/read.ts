@@ -5,10 +5,11 @@ import { homeDir, eventDir, loadEvent } from "../config/load.js";
 import { packageRoot } from "../paths.js";
 import { display, loadRoster, summarizeRoster } from "../roster/roster.js";
 import { describeSources, tableReader } from "../roster/sources.js";
-import { patternToRegExp, UserError } from "../lib/util.js";
+import { patternToRegExp, untrusted, UserError } from "../lib/util.js";
 import { errorMessage } from "../github/api.js";
 import type { Ctx } from "../plans/engine.js";
-import { lenientRoster, mapLimit, selectTeams } from "../plans/common.js";
+import { mapLimit } from "../plans/common.js";
+import { deadlineOf, discoverRepos } from "../repos/discover.js";
 import { submissionTag } from "../plans/freeze.js";
 
 // ---------------------------------------------------------------- event_init
@@ -75,6 +76,12 @@ export async function orgCheck(ctx: Ctx) {
   const info = await ctx.gh.getOrg();
   add("default_repository_permission", info.default_repository_permission === "none", info.default_repository_permission, `Set Base permissions to "No permission" so teams cannot read each other's repos: https://github.com/organizations/${org}/settings/member_privileges`);
   add("members_can_create_repositories", info.members_can_create_repositories === false, info.members_can_create_repositories, "Turn off repository creation for members so all repos are created by this server.");
+  add(
+    "members_can_fork_private_repositories",
+    info.members_can_fork_private_repositories === false,
+    info.members_can_fork_private_repositories,
+    "Turn off forking of private repos, or anyone with read access (mentors, judges) can keep a copy of a team's code.",
+  );
   let without2fa: number | null = null;
   try {
     without2fa = (await ctx.gh.listMembersWithout2fa()).length;
@@ -123,12 +130,10 @@ export async function rosterSources(ctx: Ctx) {
   const c = r.columns;
   const a = r.assignment_columns;
   const g = r.github_ids_columns;
-  const rv = ctx.ev.cfg.reviewers;
   const wanted = [
     { role: "participants", tab: r.participants_tab, columns: [c.email, c.name, c.google_sub, c.github_login] },
     { role: "assignment", tab: r.assignment_tab, columns: [a.team_no, a.email, a.role, a.track, a.github_login] },
     ...(r.github_ids_tab ? [{ role: "github_ids", tab: r.github_ids_tab, columns: [g.email, g.github_login] }] : []),
-    ...(rv ? [{ role: "reviewers", tab: rv.tab, columns: [rv.columns.name, rv.columns.github_login, rv.columns.role, rv.columns.teams] }] : []),
   ].map((w) => ({ ...w, columns: w.columns.filter((x): x is string => !!x) }));
 
   const out = await describeSources(ctx.ev, wanted);
@@ -177,7 +182,7 @@ export async function teamsList(ctx: Ctx, args: { team_no?: string }) {
   const teams = (await ctx.gh.listTeams()).filter((t) => re.test(t.name));
   const invites = await ctx.gh.listOrgInvitations();
   const picked = args.team_no ? teams.filter((t) => t.name.toLowerCase().includes(args.team_no!.toLowerCase())) : teams;
-  const out = await mapLimit(picked, 5, async (t) => ({ team: t.name, slug: t.slug, members: await ctx.gh.listTeamMembers(t.slug) }));
+  const out = await mapLimit(picked, 5, async (t) => ({ team: untrusted(t.name, 60), slug: t.slug, members: await ctx.gh.listTeamMembers(t.slug) }));
   return {
     teams: out.sort((a, b) => a.team.localeCompare(b.team, "en", { numeric: true })),
     pending_org_invitations: invites.filter((i) => i.login).map((i) => i.login),
@@ -187,48 +192,89 @@ export async function teamsList(ctx: Ctx, args: { team_no?: string }) {
 
 // ---------------------------------------------------------------- repos_activity
 
-export async function reposActivity(ctx: Ctx, args: { team_nos?: string[] }) {
-  const roster = await lenientRoster(ctx);
-  const teams = selectTeams(ctx, roster, args.team_nos?.length ? args.team_nos : "all");
-  const start = ctx.ev.cfg.schedule.start_at ? new Date(ctx.ev.cfg.schedule.start_at) : null;
-  const freeze = ctx.ev.cfg.schedule.freeze_at ? new Date(ctx.ev.cfg.schedule.freeze_at) : null;
+const PUSH_TYPES = new Set(["push", "force_push", "pr_merge", "merge_queue_merge"]);
+
+export async function reposActivity(ctx: Ctx, args: { track?: string; team_nos?: string[] }) {
+  const cfg = ctx.ev.cfg;
+  const repos = await discoverRepos(ctx, args);
+  const start = cfg.schedule.start_at ? new Date(cfg.schedule.start_at) : null;
+  const prepOn = cfg.schedule.prep_enabled;
+  const prepFrom = prepOn && cfg.schedule.prep_from ? new Date(cfg.schedule.prep_from) : null;
   const tag = submissionTag(ctx);
 
-  const repos = await mapLimit(teams, 3, async (team) => {
-    const repo = await ctx.gh.getRepo(team.repo_name);
-    if (!repo) return { team_no: team.team_no, repo: team.repo_name, exists: false };
-    const commits = await ctx.gh.listCommits(team.repo_name, repo.default_branch, 1000);
-    const nonRoot = commits.filter((c) => c.parents > 0);
-    const at = (c: { date: string }) => new Date(c.date);
-    const before = start ? nonRoot.filter((c) => at(c) < start).length : null;
-    const during = start && freeze ? nonRoot.filter((c) => at(c) >= start && at(c) <= freeze).length : null;
-    const after = freeze ? nonRoot.filter((c) => at(c) > freeze).length : null;
-    const tagSha = await ctx.gh.getRefSha(team.repo_name, `tags/${tag}`);
-    const afterTag = tagSha ? commits.findIndex((c) => c.sha === tagSha) : -1;
+  const out = await mapLimit(repos, 3, async (r) => {
+    const name = r.name;
+    const deadlineIso = deadlineOf(cfg, r.track);
+    const deadline = deadlineIso ? new Date(deadlineIso) : null;
+    const [commits, activity, tagSha] = await Promise.all([
+      ctx.gh.listCommits(name, r.repo.default_branch, 1000),
+      ctx.gh.listRepoActivity(name, 1000).catch(() => null),
+      ctx.gh.getRefSha(name, `tags/${tag}`),
+    ]);
+
+    // Commit dates are chosen by whoever commits; the root commit is the template/initial commit.
+    const work = commits.filter((c) => c.parents > 0);
+    const at = (d: string) => new Date(d);
+    const beforeStart = start ? work.filter((c) => at(c.date) < start) : [];
+    // With a preparation period, commits inside it are fine; only those before it are "early".
+    const inPrep = prepOn ? beforeStart.filter((c) => !prepFrom || at(c.date) >= prepFrom) : [];
+    const early = start ? beforeStart.length - inPrep.length : null;
+    const during = start ? work.filter((c) => at(c.date) >= start && (!deadline || at(c.date) <= deadline)).length : null;
+    const datedAfter = deadline ? work.filter((c) => at(c.date) > deadline).length : null;
+
+    // Push times come from GitHub's servers and cannot be faked.
+    const pushes = (activity ?? []).filter((a) => PUSH_TYPES.has(a.type));
+    const late = deadline ? pushes.filter((a) => at(a.timestamp) > deadline) : [];
+    const forced = (activity ?? []).filter((a) => a.type === "force_push");
+    const onTopOfTag = tagSha ? commits.findIndex((c) => c.sha === tagSha) : -1;
+
+    const byAuthor = new Map<string, number>();
+    for (const c of work) {
+      const key = c.author_login ?? "(commits without a linked GitHub account)";
+      byAuthor.set(key, (byAuthor.get(key) ?? 0) + 1);
+    }
+
     const flags: string[] = [];
-    if (before) flags.push(`${before} commit(s) dated before the start`);
-    if (after) flags.push(`${after} commit(s) dated after the freeze`);
-    if (afterTag > 0) flags.push(`${afterTag} commit(s) on top of the submission tag`);
+    if (early) {
+      flags.push(
+        prepOn && prepFrom
+          ? `${early} commit(s) dated before the preparation period (${cfg.schedule.prep_from}): check for work made in advance (e.g. a capstone project)`
+          : `${early} commit(s) dated before the start: check for work made in advance (e.g. a capstone project)`,
+      );
+    }
+    if (late.length) flags.push(`${late.length} push(es) after the ${r.track ?? "event"} deadline (server time)`);
+    if (forced.length) flags.push(`${forced.length} force push(es): history was rewritten`);
+    if (onTopOfTag > 0) flags.push(`${onTopOfTag} commit(s) on the default branch after the submission tag`);
+    if (work.length && byAuthor.size === 1) flags.push("all commits come from one person");
+
     return {
-      team_no: team.team_no,
-      repo: team.repo_name,
-      exists: true,
-      commits: commits.length,
+      team_no: r.team_no,
+      repo: name,
+      track: r.track,
+      deadline: deadlineIso,
+      commits: work.length,
       truncated: commits.length >= 1000,
-      first_commit_at: commits.at(-1)?.date ?? null,
-      last_commit_at: commits[0]?.date ?? null,
-      before_start: before,
-      during_event: during,
-      after_freeze: after,
-      contributors: new Set(commits.map((c) => c.author_key)).size,
+      by_commit_date: { early, preparation: prepOn ? inPrep.length : null, during_event: during, after_deadline: datedAfter },
+      server_pushes: activity
+        ? {
+            total: pushes.length,
+            last_push_at: pushes[0]?.timestamp ?? null,
+            after_deadline: late.slice(0, 10).map((a) => ({ at: a.timestamp, by: a.actor, type: a.type, branch: untrusted(a.ref.replace("refs/heads/", ""), 80) })),
+            force_pushes: forced.length,
+          }
+        : "unavailable",
+      contributors: [...byAuthor.entries()].sort((a, b) => b[1] - a[1]).map(([login, n]) => ({ login, commits: n })),
       submission_tag: tagSha ? tagSha.slice(0, 7) : null,
       flags,
     };
   });
 
   return {
-    window: { start_at: ctx.ev.cfg.schedule.start_at ?? null, freeze_at: ctx.ev.cfg.schedule.freeze_at ?? null },
-    repos,
-    note: "Commit dates are set by the committer and can be faked. The template's initial commit is not counted. Use this as a pointer for the judges, not as a verdict.",
+    start_at: cfg.schedule.start_at ?? null,
+    preparation: prepOn ? { enabled: true, from: cfg.schedule.prep_from ?? null } : { enabled: false },
+    deadlines: Object.fromEntries([["event", deadlineOf(cfg, null)], ...Object.keys(cfg.tracks).map((k) => [k, deadlineOf(cfg, k)])]),
+    repos: out,
+    flagged: out.filter((r) => r.flags.length).map((r) => `${r.repo}: ${r.flags.join("; ")}`),
+    note: "Commit dates can be faked; server push times cannot. A deadline of null means deadline checks are off for that track (schedule_set). Flags point judges at something to look at, they are not a verdict.",
   };
 }

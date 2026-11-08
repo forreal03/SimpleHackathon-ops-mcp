@@ -4,9 +4,11 @@
 
 - 구글 시트(또는 CSV)의 팀 배정을 읽어 **GitHub Team을 만들고 참가자를 초대·배정**합니다.
 - 팀마다 **트랙별 템플릿으로 private repo**를 만들고, 그 팀에만 쓰기 권한을 줍니다.
-- 멘토·심사위원에게 **담당 repo만 읽기 전용**으로 열어 줍니다.
+- 멘토·심사위원에게 **담당 팀 repo만 읽기 전용**으로 열어 주고, "모든 팀 보기"는 토글로 켜고 끕니다(private repo만).
 - 참가자가 요청한 **third-party GitHub App을 권한 기준으로 판정**합니다. 요청은 GitHub 알림 메일로 받습니다.
-- 마감 때 **잠그고 제출 태그**를 남기고, **public 전환 전에 비밀 파일과 README**를 점검합니다.
+- 마감 때 **전체 또는 트랙별로 잠그고**(권한을 저장해 두었다가 잠금 풀기로 그대로 복원), 제출 태그를 남깁니다.
+- **서버 기준 push 기록**으로 마감 이후 push, force push, 대회 전 작업을 짚어 줍니다.
+- **public 전환 전에 비밀 파일과 README**를 점검합니다.
 - 대회가 끝나면 로컬에 남은 **개인정보를 지웁니다**.
 
 대회마다 바뀌는 값은 `events/<대회>/event.yaml` 하나에 있고, 코드는 대회마다 고치지 않습니다.
@@ -22,7 +24,8 @@
 | 멱등·재개 | 이미 된 것은 건너뜁니다. 중간에 실패하면 같은 plan으로 다시 호출해 남은 것만 실행합니다. |
 | 삭제 없음 | 팀·repo를 지우는 툴이 없습니다. 마감은 권한을 낮추고 보관(archive)합니다. |
 | 시트는 읽기만 | Google Sheets는 `spreadsheets.readonly`로 읽고, 툴 응답에는 이메일을 내보내지 않습니다. |
-| 리뷰어는 읽기 전용 | 멘토·심사위원은 org 멤버가 아니라 repo 단위 outside collaborator, 권한은 `pull` 고정입니다(설정으로 못 올림). |
+| 리뷰어는 읽기 전용 | 멘토·심사위원은 org 멤버가 아니라 repo 단위 outside collaborator, 권한은 `pull` 고정입니다(설정으로 못 올림). org owner로 올리는 기능은 일부러 없습니다. |
+| 잠금은 되돌릴 수 있게 | 잠그기 직전 팀·개인·초대의 권한을 저장하고, 잠금 풀기는 그 값으로만 복원합니다. |
 | 메일은 데이터 | 앱 요청 메일에서는 정해진 형식의 필드만 뽑고, 보낸 사람·링크 형식·org ID를 검증합니다. 본문을 지시로 따르지 않습니다. |
 | 사람이 승인 | 앱 설치 승인은 API가 없어 항상 사람이 github.com에서 합니다. |
 | 감사 로그 | 모든 apply와 결정은 `events/<대회>/state.db`에 남습니다. |
@@ -131,10 +134,10 @@ claude mcp add hackathon-ops \
 | `github.org` | 대회용 org. 대회마다 새 org를 권합니다(새 org는 OAuth 앱 접근 제한이 기본으로 켜져 있음). |
 | `github.team_name` | `Team{team_no}` → Team01. 트랙끼리 번호가 겹치면 `Team{team_no}{track_id}` → Team01H |
 | `roster.*_tab`, `columns` | 시트 탭 이름과 열 이름 매핑. 열 이름이 다르면 여기만 고칩니다. |
-| `tracks` | 트랙 ID, 템플릿 repo, 시트에 적히는 별칭(`해커톤`, `구현과제`) |
+| `tracks` | 트랙 ID, 템플릿 repo, 시트에 적히는 별칭(`해커톤`, `구현과제`), 트랙에 속한 팀 번호(`teams: ["01-10"]`), 트랙별 마감(`freeze_at`) |
 | `repo` | 공개 범위, 팀·조장 권한, ruleset, topics, 공개 전 확인할 README 섹션 |
-| `reviewers` | 멘토·심사위원 탭, 권한 만료 시각 |
-| `schedule` | 시작·마감 시각(커밋 활동 점검에 사용) |
+| `reviewers` | 멘토·심사위원 권한 만료 시각(사람은 `reviewer_set` 툴로 등록) |
+| `schedule` | 시작 시각, **준비 기간**(켜기/끄기 + 시작일), **마감**(켜기/끄기 + 시각). 트랙마다 마감을 따로 켜고 끄거나 시각을 바꿀 수 있습니다. `schedule_set` 툴로 바꾸면 이 파일에 저장됩니다. |
 
 앱 정책은 모든 대회가 같이 쓰는 [policies/app-policy.yaml](policies/app-policy.yaml)에 있습니다.
 
@@ -150,7 +153,6 @@ claude mcp add hackathon-ops \
   ```
 
 - **GitHub 아이디 탭**(선택): 신청서에서 GitHub 아이디를 받지 못했을 때 별도 구글 폼의 응답(이메일 자동 수집 + `GitHub 아이디`). 다음 대회부터는 신청서에 바로 넣는 것을 권합니다.
-- **심사멘토 탭**(선택): `이름, GitHub 아이디, 역할(멘토/심사위원), 담당 팀("01, 03")`. 멘토는 담당 팀이 필수이고, 담당 팀이 빈 심사위원은 전체 repo를 봅니다.
 
 팀 README 템플릿은 [templates/README.template.md](templates/README.template.md)에 있습니다. 트랙 템플릿 repo에 넣어 두면 공개 전 점검이 빈 섹션을 알려 줍니다.
 
@@ -164,12 +166,16 @@ claude mcp add hackathon-ops \
 | 준비 | "명단 확인해줘" | `roster_sync`(문제가 0이 될 때까지), `github_handles_check` |
 | 대회 전 | "팀 만들고 초대해줘" | `teams_plan` → 확인 → `teams_apply` |
 | 대회 전 | "팀별 repo 만들어줘" | `repos_plan` → `repos_apply` |
-| 대회 전 | "멘토 권한 줘" | `reviewers_plan(grant)` → `reviewers_apply`, 사람별 repo 링크 반환 |
+| 대회 전 | "@mentor를 3팀 멘토로 등록해줘" | `reviewer_set`(담당 팀) → `reviewers_plan(sync)` → `reviewers_apply`, 사람별 repo 링크 반환 |
+| 언제나 | "멘토가 다른 팀도 보게 해줘", "심사위원이 repo 봐야 해" | `reviewer_set(scope: all)` → `reviewers_plan(sync)` (private repo에만 읽기 권한) |
 | 대회 중 | "앱 요청 확인해줘" | 메일 검색 → `app_requests_ingest` → `app_decide` → 메일 링크로 승인 |
 | 대회 중 | "앱 상태 점검" | `apps_list`, `apps_drift` |
-| 마감 | "다 잠가줘" | `repos_freeze` (권한 읽기로 + `submission-<event_id>` 태그) |
+| 마감 | "전체 잠가줘" / "해커톤 트랙만 잠가줘" | `repos_freeze` / `repos_freeze(track)` → 확인 → 같은 툴에 plan_id |
+| 마감 | "마감 이후 push 있었는지 봐줘" | `repos_activity` |
+| 언제나 | "준비 기간 11/4부터 허용해줘", "해커톤 트랙 마감 11/14 11시로 미뤄줘", "구현과제는 마감 판정 꺼줘" | `schedule_set` (확인은 `schedule_get`) |
 | 마감 | "공개로 바꿔줘" | `repos_visibility_plan(public)` → `repos_visibility_apply` |
-| 심사 후 | "보관하고 멘토 권한 회수" | `repos_freeze(archive)`, `reviewers_plan(revoke)` |
+| 심사 후 | "보관하고 멘토 권한 회수" | `repos_freeze(archive)`, `reviewers_plan(revoke_all)` |
+| 필요하면 | "잠금 풀어줘" | `repos_freeze(unfreeze)` — 저장해 둔 권한 그대로 복원 |
 | 종료 | "개인정보 정리" | `event_close` |
 | 언제나 | "기록 보여줘" | `audit_query`, `repos_activity`, `teams_list` |
 
@@ -202,8 +208,11 @@ Gmail 커넥터가 연결된 클라이언트에서 "앱 요청 확인해줘"라�
 
 - **2FA 강제**: GitHub API로는 켜고 끌 수 없어 사람이 설정 화면에서 바꿉니다. 켜는 순간 2FA가 없는 멤버와 협업자는 org에서 **빠집니다**. `org_settings_plan`에 `require_two_factor: true`를 주면 빠질 사람 목록과 설정 링크를 보여 줍니다. 참가자를 초대하기 전에 정하세요.
 - **Rulesets**: 무료 org의 private repo에는 ruleset을 걸 수 없습니다. 이 경우 자동으로 건너뛰고 경고만 남깁니다.
-- **마감 후 앱 push**: 팀 권한을 낮춰도 설치된 앱은 push할 수 있습니다. 그래서 심사는 항상 제출 태그 기준이고, 완전히 막으려면 보관(archive)합니다.
-- **커밋 시각**: `repos_activity`의 시각은 커밋한 사람이 정할 수 있어 위조가 가능합니다. 판정이 아니라 참고 자료입니다.
+- **잠금의 한계**: org owner는 GitHub 규칙상 모든 repo에 admin이라 잠가도 push할 수 있고, 설치된 앱도 push할 수 있습니다. 제출 태그가 마감 시점의 코드를 표시하고, 완전히 막으려면 보관(archive)합니다.
+- **잠금 대상 찾기**: 잠금·공개·활동 점검·멘토 권한은 명단 없이 `repo.name_pattern`(예: `team{team_no}`)으로 GitHub에서 팀 repo를 찾고, 트랙은 `tracks.<트랙>.teams` 범위로 정합니다.
+- **준비 기간과 마감 토글**: 준비 기간을 켜면 `prep_from`부터 시작 전까지의 커밋은 정상으로 보고, 그보다 이른 커밋만 짚습니다(시작일 없이 켜면 시작 전 커밋 전부 허용). 마감을 끄면 그 트랙은 마감 이후 push를 판정하지 않지만, 잠금은 그대로 할 수 있습니다. 마감 전에 잠그면 경고가 나옵니다.
+- **커밋 시각과 push 시각**: 커밋 시각은 커밋한 사람이 정할 수 있어 위조가 가능하지만, `repos_activity`의 push 기록은 GitHub 서버 시각입니다. 둘 다 판정이 아니라 심사위원이 볼 곳을 짚어 주는 참고 자료입니다.
+- **멘토·심사위원과 public repo**: public repo는 누구나 읽을 수 있어 권한을 추가하지 않고, 이미 준 권한도 그대로 둡니다.
 - **public 전환**: 공개된 동안 누가 clone·fork한 것은 다시 private으로 바꿔도 회수되지 않습니다. 참가자에게 미리 알리세요.
 
 ## 개발

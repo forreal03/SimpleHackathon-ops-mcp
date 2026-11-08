@@ -31,21 +31,59 @@ export interface ReadmeReport {
   empty: string[];
 }
 
-const PLACEHOLDER = /^(todo|tbd|tba|n\/a|-|작성|작성 예정|미정|\(작성\)|\(.*입력.*\)|<.*>)$/i;
+/** README text and lines are capped so a hostile README cannot make the check slow. */
+export const README_MAX_CHARS = 200_000;
+const LINE_MAX_CHARS = 2_000;
+const PLACEHOLDER_WORDS = new Set(["todo", "tbd", "tba", "n/a", "-", "작성", "작성 예정", "미정", "(작성)"]);
+
+/** Placeholder lines ("TODO", "작성 예정", "(여기에 입력)", "<링크>") do not count as content. Linear time. */
+function isPlaceholder(line: string): boolean {
+  const l = line.toLowerCase();
+  if (PLACEHOLDER_WORDS.has(l)) return true;
+  if (l.startsWith("(") && l.endsWith(")") && l.includes("입력")) return true;
+  return l.startsWith("<") && l.endsWith(">");
+}
+
+/** "## 기술 스택 ##" -> { level: 2, text: "기술 스택" }. Linear time, no regex backtracking. */
+function heading(line: string): { level: number; text: string } | null {
+  let level = 0;
+  while (level < line.length && line[level] === "#") level++;
+  if (level === 0 || level > 6 || (line[level] !== " " && line[level] !== "\t")) return null;
+  let text = line.slice(level).trim();
+  let end = text.length;
+  while (end > 0 && text[end - 1] === "#") end--;
+  text = text.slice(0, end).trim();
+  return { level, text: text.toLowerCase() };
+}
+
+/** Removes <!-- ... --> in one pass (an unclosed comment runs to the end). */
+function stripComments(text: string): string {
+  let out = "";
+  let i = 0;
+  for (;;) {
+    const open = text.indexOf("<!--", i);
+    if (open === -1) return out + text.slice(i);
+    out += text.slice(i, open);
+    const close = text.indexOf("-->", open + 4);
+    if (close === -1) return out;
+    i = close + 3;
+  }
+}
 
 /**
  * For each required section: is there a heading containing that text, and does it have content?
- * HTML comments and placeholder lines ("TODO", "작성 예정", "-") do not count as content.
+ * HTML comments and placeholder lines do not count as content.
  */
 export function checkReadme(readme: string | null, required: string[]): ReadmeReport {
   if (!required.length) return { has_readme: readme !== null, missing: [], empty: [] };
   if (readme === null) return { has_readme: false, missing: [...required], empty: [] };
 
-  const lines = readme.replace(/<!--[\s\S]*?-->/g, "").split(/\r?\n/);
-  const headings = lines
-    .map((line, i) => ({ i, m: line.match(/^(#{1,6})\s+(.*?)\s*#*\s*$/) }))
-    .filter((h): h is { i: number; m: RegExpMatchArray } => !!h.m)
-    .map((h) => ({ line: h.i, level: h.m[1]!.length, text: h.m[2]!.toLowerCase() }));
+  const text = stripComments(readme.slice(0, README_MAX_CHARS));
+  const lines = text.split(/\r?\n/).map((l) => (l.length > LINE_MAX_CHARS ? l.slice(0, LINE_MAX_CHARS) : l));
+  const headings = lines.flatMap((line, i) => {
+    const h = heading(line);
+    return h ? [{ line: i, ...h }] : [];
+  });
 
   const missing: string[] = [];
   const empty: string[] = [];
@@ -59,8 +97,8 @@ export function checkReadme(readme: string | null, required: string[]): ReadmeRe
     const next = headings.slice(idx + 1).find((n) => n.level <= h.level);
     const body = lines
       .slice(h.line + 1, next ? next.line : lines.length)
-      .map((l) => l.replace(/^\s*([-*+]|\d+\.)\s*/, "").replace(/^>\s*/, "").trim())
-      .filter((l) => l && !PLACEHOLDER.test(l) && !/^#{1,6}\s/.test(l));
+      .map((l) => l.trim().replace(/^([-*+]|\d+\.)\s*/, "").replace(/^>\s*/, "").trim())
+      .filter((l) => l && !isPlaceholder(l) && !heading(l));
     if (body.length === 0) empty.push(section);
   }
   return { has_readme: true, missing, empty };

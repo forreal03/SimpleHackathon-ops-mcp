@@ -86,7 +86,7 @@ describe("config", () => {
   });
 
   it("refuses reviewer permissions other than pull", () => {
-    expect(() => parseEventYaml(EVENT_YAML.replace("tab: reviewers", "tab: reviewers\n  permission: push"))).toThrow(/reviewers.permission/);
+    expect(() => parseEventYaml(EVENT_YAML + "\nreviewers:\n  permission: push\n")).toThrow(/reviewers.permission/);
   });
 
   it("requires the sheet link for google_sheets", () => {

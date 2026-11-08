@@ -33,6 +33,22 @@ export interface Invitation {
   id: number;
   login: string | null;
   email: string | null;
+  /** Repo invitations only: the permission offered, normalised to pull/push/... */
+  permission?: string | null;
+}
+
+export interface Principal {
+  /** Team slug or user login. */
+  id: string;
+  name: string;
+  permission: string;
+}
+
+export interface ActivityEvent {
+  type: string;
+  timestamp: string;
+  actor: string | null;
+  ref: string;
 }
 
 export interface RepoInfo {
@@ -97,6 +113,15 @@ export interface GhApi {
   removeTeamMember(slug: string, login: string): Promise<void>;
   inviteToOrg(target: { invitee_id: number } | { email: string }, teamIds: number[]): Promise<void>;
 
+  listOrgRepos(): Promise<RepoInfo[]>;
+  listOrgOwners(): Promise<string[]>;
+  /** Teams with access to the repo and their permission. */
+  listRepoTeams(repo: string): Promise<Principal[]>;
+  /** Users added to the repo directly (not through a team or org ownership). */
+  listDirectCollaborators(repo: string): Promise<Principal[]>;
+  updateRepoInvitation(repo: string, id: number, permission: "read" | "triage" | "write" | "maintain" | "admin"): Promise<void>;
+  /** Server-side push/merge/force-push log (cannot be faked like commit dates). */
+  listRepoActivity(repo: string, max: number): Promise<ActivityEvent[]>;
   getRepo(name: string): Promise<RepoInfo | null>;
   /** "owner/repo" of a template; null when it does not exist or is not visible. */
   getTemplate(fullName: string): Promise<{ is_template: boolean } | null>;

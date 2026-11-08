@@ -4,7 +4,7 @@ import { teamsPlan, moveMemberPlan } from "../src/plans/teams.js";
 import { reposPlan } from "../src/plans/repos.js";
 import { freezePlan } from "../src/plans/freeze.js";
 import { visibilityPlan } from "../src/plans/visibility.js";
-import { reviewersPlan } from "../src/plans/reviewers.js";
+import { reviewerRemove, reviewersPlan, reviewerSet } from "../src/plans/reviewers.js";
 import { closePlan } from "../src/plans/close.js";
 import { orgSettingsPlan } from "../src/plans/orgsettings.js";
 import { loadRoster } from "../src/roster/roster.js";
@@ -139,29 +139,71 @@ describe("repos", () => {
   });
 });
 
-describe("deadline", () => {
-  it("freezes: read-only team and leader, submission tag, optional archive; unfreeze restores", async () => {
+describe("deadline lock", () => {
+  it("lowers every team, person and invitation to read, tags, and unfreeze puts back exactly what was there", async () => {
     const { ctx, gh } = await readyOrg();
-    const f = await plan(ctx, freezePlan, {});
-    expect(f.changes.filter((c) => c.target.startsWith("repo:Team01")).map((c) => c.op)).toEqual(["set_team_permission", "set_collaborator", "create_tag"]);
-
-    gh.repos.get("Team01")!.refs.set("heads/main", "sha-final");
-    await applyPlan(ctx, freezePlan, f.plan_id, f.confirm_code);
     const repo = gh.repos.get("Team01")!;
+    repo.collaborators.set("helper", "push"); // access someone granted by hand
+    gh.users.set("helper", { id: 900, login: "helper", type: "User" });
+    gh.owners.add("boss");
+    repo.collaborators.set("boss", "admin"); // org owner: GitHub will not lower it
+    repo.invitations.push({ id: 77, login: "late-joiner", email: null, permission: "push" });
+
+    const f = await plan(ctx, freezePlan, {});
+    expect(f.changes.filter((c) => c.target.startsWith("repo:Team01")).map((c) => `${c.op} ${c.target}`)).toEqual([
+      "lower_team repo:Team01/team:team01",
+      "lower_user repo:Team01/user:alice-gh",
+      "lower_user repo:Team01/user:helper",
+      "lower_invitation repo:Team01/invitation:77",
+      "create_tag repo:Team01/tag",
+    ]);
+    expect(f.warnings.join("\n")).toMatch(/Org owners \(1\) keep admin/);
+
+    repo.refs.set("heads/main", "sha-final");
+    await applyPlan(ctx, freezePlan, f.plan_id, f.confirm_code);
     expect(repo.teamPerms.get("team01")).toBe("pull");
     expect(repo.collaborators.get("alice-gh")).toBe("pull");
+    expect(repo.collaborators.get("helper")).toBe("pull");
+    expect(repo.collaborators.get("boss")).toBe("admin");
+    expect(repo.invitations[0]!.permission).toBe("pull");
     expect(repo.refs.get("tags/submission-test-event")).toBe("sha-final");
 
-    const a = await plan(ctx, freezePlan, { archive: true });
-    expect(a.changes.map((c) => c.op)).toEqual(["archive", "archive"]);
-    await applyPlan(ctx, freezePlan, a.plan_id, a.confirm_code);
+    // A second freeze has nothing left to do and must not overwrite the saved permissions.
+    expect((await createPlan(ctx, freezePlan, { tag: false })).plan_id).toBeNull();
 
     const u = await plan(ctx, freezePlan, { unfreeze: true });
-    expect(u.changes.filter((c) => c.target.startsWith("repo:Team01")).map((c) => c.op)).toEqual(["unarchive", "set_team_permission", "set_collaborator"]);
+    await applyPlan(ctx, freezePlan, u.plan_id, u.confirm_code);
+    expect(repo.teamPerms.get("team01")).toBe("push");
+    expect(repo.collaborators.get("alice-gh")).toBe("maintain");
+    expect(repo.collaborators.get("helper")).toBe("push");
+    expect(repo.invitations[0]!.permission).toBe("push");
+    expect(ctx.db.snapshots()).toEqual([]);
+  });
+
+  it("locks one track at a time", async () => {
+    const { ctx, gh } = await readyOrg();
+    const f = await plan(ctx, freezePlan, { track: "assignment", tag: false });
+    expect([...new Set(f.changes.map((c) => c.target.split("/")[0]))]).toEqual(["repo:Team02"]);
+    expect(f.info?.repos).toEqual([{ repo: "Team02", team_no: "02", track: "assignment", deadline: "2026-11-14T09:00:00+09:00" }]);
+    await applyPlan(ctx, freezePlan, f.plan_id, f.confirm_code);
+    expect(gh.repos.get("Team01")!.teamPerms.get("team01")).toBe("push");
+    expect(gh.repos.get("Team02")!.teamPerms.get("team02")).toBe("pull");
+    await expect(createPlan(ctx, freezePlan, { track: "nope" })).rejects.toThrow(/Unknown track "nope"/);
+  });
+
+  it("archives on request and unarchives on unfreeze", async () => {
+    const { ctx, gh } = await readyOrg();
+    const f = await plan(ctx, freezePlan, { team_nos: ["1"], archive: true, tag: false });
+    expect(f.changes.map((c) => c.op)).toEqual(["lower_team", "lower_user", "archive"]);
+    await applyPlan(ctx, freezePlan, f.plan_id, f.confirm_code);
+    expect(gh.repos.get("Team01")!.archived).toBe(true);
+    const u = await plan(ctx, freezePlan, { team_nos: ["01"], unfreeze: true });
+    expect(u.changes.map((c) => c.op)).toEqual(["unarchive", "restore_team", "restore_user"]);
   });
 
   it("goes public except repos with secret-looking files, and handles archived repos", async () => {
     const { ctx, gh } = await readyOrg();
+    ctx.now = () => new Date("2026-11-15T00:00:00Z");
     gh.repos.get("Team02")!.tree = ["README.md", "server/.env"];
     gh.repos.get("Team01")!.archived = true;
     gh.repos.get("Team01")!.readme = "## 서비스 링크\nhttps://team01.example\n## 기술 스택\n";
@@ -174,34 +216,73 @@ describe("deadline", () => {
     await applyPlan(ctx, visibilityPlan, p.plan_id, p.confirm_code);
     expect(gh.repos.get("Team01")).toMatchObject({ visibility: "public", archived: true });
 
-    const forced = await plan(ctx, visibilityPlan, { visibility: "public", force_repos: ["Team02"] });
-    expect(forced.changes.map((c) => c.op)).toEqual(["set_visibility"]);
+    const forced = await plan(ctx, visibilityPlan, { visibility: "public", track: "assignment", force_repos: ["Team02"] });
+    expect(forced.changes.map((c) => `${c.op} ${c.target}`)).toEqual(["set_visibility repo:Team02"]);
+  });
+
+  it("flags late pushes, force pushes, early work and one-person repos", async () => {
+    const { ctx, gh } = await readyOrg();
+    const repo = gh.repos.get("Team02")!;
+    repo.commits = [
+      { sha: "c3", date: "2026-11-14T00:30:00Z", author_login: "carol-gh", author_key: "carol-gh", parents: 1 },
+      { sha: "c2", date: "2026-11-13T12:00:00Z", author_login: "carol-gh", author_key: "carol-gh", parents: 1 },
+      { sha: "c1", date: "2026-10-01T00:00:00Z", author_login: "carol-gh", author_key: "carol-gh", parents: 1 },
+      { sha: "c0", date: "2026-09-30T00:00:00Z", author_login: null, author_key: "x", parents: 0 },
+    ];
+    gh.activity.set("Team02", [
+      { type: "push", timestamp: "2026-11-14T00:30:05Z", actor: "carol-gh", ref: "refs/heads/main" },
+      { type: "force_push", timestamp: "2026-11-13T13:00:00Z", actor: "carol-gh", ref: "refs/heads/main" },
+    ]);
+    const { reposActivity } = await import("../src/ops/read.js");
+    const out = await reposActivity(ctx, { track: "assignment" });
+    const r = out.repos[0]!;
+    expect(r.deadline).toBe("2026-11-14T09:00:00+09:00");
+    expect(r.by_commit_date).toEqual({ early: 1, preparation: null, during_event: 1, after_deadline: 1 });
+    expect(r.flags).toEqual([
+      "1 commit(s) dated before the start: check for work made in advance (e.g. a capstone project)",
+      "1 push(es) after the assignment deadline (server time)",
+      "1 force push(es): history was rewritten",
+      "all commits come from one person",
+    ]);
   });
 });
 
-describe("reviewers", () => {
-  it("gives mentors read access to their teams only and judges to all, then revokes", async () => {
+describe("mentors and judges", () => {
+  it("mentors see their team, judges everything, only private repos, and scope is a toggle", async () => {
     const { ctx, gh } = await readyOrg();
-    const g = await plan(ctx, reviewersPlan, { action: "grant" });
-    expect(g.changes.map((c) => c.target)).toEqual(["repo:Team01/user:judge-gh", "repo:Team01/user:mentor-gh", "repo:Team02/user:judge-gh"]);
-    expect(g.info?.links).toEqual([
-      { name: "Mentor M", github_login: "mentor-gh", role: "mentor", repos: ["https://github.com/test-org/Team01"] },
-      { name: "Judge J", github_login: "judge-gh", role: "judge", repos: ["https://github.com/test-org/Team01", "https://github.com/test-org/Team02"] },
-    ]);
-    await applyPlan(ctx, reviewersPlan, g.plan_id, g.confirm_code);
-    expect(gh.calls.filter((c) => c === "setCollaborator").length).toBeGreaterThan(0);
+    await reviewerSet(ctx, { github_login: "mentor-gh", name: "Mentor M", role: "mentor", teams: ["1"] });
+    await reviewerSet(ctx, { github_login: "@judge-gh", name: "Judge J", role: "judge" });
+    gh.repos.get("Team02")!.visibility = "public";
+
+    const s = await plan(ctx, reviewersPlan, { action: "sync" });
+    expect(s.changes.map((c) => c.target)).toEqual(["repo:Team01/user:judge-gh", "repo:Team01/user:mentor-gh"]);
+    await applyPlan(ctx, reviewersPlan, s.plan_id, s.confirm_code);
     expect(gh.repos.get("Team01")!.invitations.map((i) => i.login).sort()).toEqual(["judge-gh", "mentor-gh"]);
+    expect((await createPlan(ctx, reviewersPlan, { action: "sync" })).plan_id).toBeNull();
 
-    // Pending invitations are not re-sent.
-    expect((await createPlan(ctx, reviewersPlan, { action: "grant" })).plan_id).toBeNull();
+    // Toggle the mentor to every repo: Team02 goes back to private, so they get it.
+    gh.repos.get("Team02")!.visibility = "private";
+    await reviewerSet(ctx, { github_login: "mentor-gh", role: "mentor", scope: "all" });
+    const toggled = await plan(ctx, reviewersPlan, { action: "sync" });
+    expect(toggled.changes.map((c) => c.target)).toEqual(["repo:Team02/user:judge-gh", "repo:Team02/user:mentor-gh"]);
 
-    // After accepting they are outside collaborators; revoke removes them.
+    // Accepted invitations become outside collaborators; removing the mentor takes access away.
     const team01 = gh.repos.get("Team01")!;
-    team01.invitations = [];
+    team01.invitations = team01.invitations.filter((i) => i.login !== "mentor-gh");
     team01.outside.add("mentor-gh");
-    team01.collaborators.set("mentor-gh", "pull");
-    const r = await plan(ctx, reviewersPlan, { action: "revoke" });
-    expect(r.changes.map((c) => `${c.op} ${c.target}`)).toEqual(["remove_collaborator repo:Team01/user:mentor-gh", "delete_invitation repo:Team02/invitation:judge-gh"]);
+    await reviewerRemove(ctx, { github_login: "mentor-gh" });
+    const removed = await plan(ctx, reviewersPlan, { action: "sync" });
+    expect(removed.changes.map((c) => `${c.op} ${c.target}`)).toEqual(["add_collaborator repo:Team02/user:judge-gh", "remove_collaborator repo:Team01/user:mentor-gh"]);
+
+    const all = await plan(ctx, reviewersPlan, { action: "revoke_all" });
+    expect(all.changes.map((c) => c.op).sort()).toEqual(["delete_invitation", "remove_collaborator"]);
+  });
+
+  it("refuses a mentor without teams and unknown team numbers", async () => {
+    const { ctx } = await readyOrg();
+    await expect(reviewerSet(ctx, { github_login: "mentor-gh", role: "mentor" })).rejects.toThrow(/give the team numbers/);
+    await expect(reviewerSet(ctx, { github_login: "mentor-gh", role: "mentor", teams: ["09"] })).rejects.toThrow(/No repo for team\(s\) 09/);
+    await expect(reviewerSet(ctx, { github_login: "nobody-here", role: "judge" })).rejects.toThrow(/does not exist/);
   });
 });
 

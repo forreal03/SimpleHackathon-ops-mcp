@@ -1,4 +1,4 @@
-import type { AppInfo, CommitInfo, GhApi, Installation, Invitation, OrgInfo, RepoInfo, RepoPermission, TeamInfo } from "../src/github/api.js";
+import type { ActivityEvent, AppInfo, CommitInfo, GhApi, Installation, Invitation, OrgInfo, RepoInfo, RepoPermission, TeamInfo } from "../src/github/api.js";
 
 const RANK: Record<string, number> = { none: 0, pull: 1, triage: 2, push: 3, maintain: 4, admin: 5 };
 
@@ -141,6 +141,29 @@ export class FakeGh implements GhApi {
       this.invitations.push({ id: this.nextId++, login: user.login, email: null });
     }
   }
+  owners = new Set<string>();
+  activity = new Map<string, ActivityEvent[]>();
+
+  async listOrgRepos() {
+    return [...this.repos.values()];
+  }
+  async listOrgOwners() {
+    return [...this.owners];
+  }
+  async listRepoTeams(repo: string) {
+    return [...this.repo(repo).teamPerms.entries()].map(([slug, permission]) => ({ id: slug, name: this.teams.find((t) => t.slug === slug)?.name ?? slug, permission }));
+  }
+  async listDirectCollaborators(repo: string) {
+    return [...this.repo(repo).collaborators.entries()].map(([login, permission]) => ({ id: login, name: login, permission }));
+  }
+  async updateRepoInvitation(repo: string, id: number, permission: string) {
+    this.hit("updateRepoInvitation");
+    const inv = this.repo(repo).invitations.find((i) => i.id === id);
+    if (inv) inv.permission = ({ read: "pull", write: "push" } as Record<string, string>)[permission] ?? permission;
+  }
+  async listRepoActivity(repo: string, max: number) {
+    return (this.activity.get(repo) ?? []).slice(0, max);
+  }
   async getRepo(name: string) {
     return this.repos.get(name) ?? null;
   }
@@ -184,8 +207,9 @@ export class FakeGh implements GhApi {
   async setCollaborator(repo: string, login: string, permission: RepoPermission) {
     this.hit("setCollaborator");
     const r = this.repo(repo);
-    if (this.orgMembers.has(login)) r.collaborators.set(login, permission);
-    else r.invitations.push({ id: this.nextId++, login, email: null });
+    // Org members and existing collaborators are updated in place; anyone else gets an invitation.
+    if (this.orgMembers.has(login) || r.collaborators.has(login)) r.collaborators.set(login, permission);
+    else r.invitations.push({ id: this.nextId++, login, email: null, permission });
   }
   async removeCollaborator(repo: string, login: string) {
     this.hit("removeCollaborator");

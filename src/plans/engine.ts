@@ -28,6 +28,8 @@ export interface PlanKind<I> {
   kind: string;
   codePrefix: string;
   compute(ctx: Ctx, input: I): Promise<PlanResult>;
+  /** Pause between writes for this kind, capped by write_delay_ms (freeze goes faster so all teams lock together). */
+  writeDelayMs?: number;
   /** Scratch is shared across one apply run (e.g. team ids created earlier in the run). */
   execute(ctx: Ctx, change: Change, scratch: Map<string, unknown>): Promise<string | void>;
 }
@@ -95,7 +97,7 @@ export async function applyPlan<I>(ctx: Ctx, kind: PlanKind<I>, planId: string, 
 
   const scratch = new Map<string, unknown>();
   const applied: { op: string; target: string; note?: string }[] = [];
-  const delay = ctx.ev.cfg.write_delay_ms;
+  const delay = Math.min(ctx.ev.cfg.write_delay_ms, kind.writeDelayMs ?? Number.POSITIVE_INFINITY);
 
   for (const [i, change] of remaining.entries()) {
     if (i > 0) await sleep(delay);

@@ -83,6 +83,18 @@ export function newConfirmCode(prefix: string): string {
   return `${prefix.toUpperCase()}-${randomInt(1000, 10000)}`;
 }
 
+/**
+ * Text a participant controls (branch names, file paths, team names) on its way into a tool result:
+ * control characters removed, whitespace collapsed, length capped. It is still data, never instructions.
+ */
+export function untrusted(value: unknown, max = 120): string {
+  const s = String(value ?? "")
+    .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2066-\u2069]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return s.length > max ? `${s.slice(0, max - 1)}…` : s;
+}
+
 export function countBy<T>(items: T[], key: (item: T) => string): Record<string, number> {
   const out: Record<string, number> = {};
   for (const item of items) out[key(item)] = (out[key(item)] ?? 0) + 1;

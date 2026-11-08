@@ -75,7 +75,34 @@ CREATE TABLE IF NOT EXISTS app_requests (
   review_url TEXT NOT NULL, received_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS repo_flags (repo TEXT NOT NULL, flag TEXT NOT NULL, PRIMARY KEY (repo, flag));
+CREATE TABLE IF NOT EXISTS freeze_snapshot (
+  repo TEXT NOT NULL, kind TEXT NOT NULL, principal TEXT NOT NULL, permission TEXT NOT NULL, saved_at TEXT NOT NULL,
+  PRIMARY KEY (repo, kind, principal)
+);
+CREATE TABLE IF NOT EXISTS reviewers (
+  login TEXT PRIMARY KEY, name TEXT NOT NULL, role TEXT NOT NULL, scope TEXT NOT NULL, teams TEXT NOT NULL,
+  active INTEGER NOT NULL, updated_at TEXT NOT NULL
+);
 `;
+
+export interface SnapshotRow {
+  repo: string;
+  /** team (slug), user (login) or invitation (id). */
+  kind: "team" | "user" | "invitation";
+  principal: string;
+  permission: string;
+}
+
+export interface ReviewerRow {
+  login: string;
+  name: string;
+  role: "mentor" | "judge";
+  /** team: only the listed teams' repos. all: every event repo. */
+  scope: "team" | "all";
+  teams: string[];
+  active: boolean;
+  updated_at: string;
+}
 
 const j = (v: unknown) => JSON.stringify(v ?? null);
 const p = <T>(v: unknown, fallback: T): T => (typeof v === "string" ? (JSON.parse(v) as T) : fallback);
@@ -209,8 +236,53 @@ export class StateDb {
     this.db.prepare("INSERT OR IGNORE INTO repo_flags (repo, flag) VALUES (?, ?)").run(repo, flag);
   }
 
+  clearFlag(repo: string, flag: string) {
+    this.db.prepare("DELETE FROM repo_flags WHERE repo = ? AND flag = ?").run(repo, flag);
+  }
+
   hasFlag(repo: string, flag: string): boolean {
     return !!this.db.prepare("SELECT 1 FROM repo_flags WHERE repo = ? AND flag = ?").get(repo, flag);
+  }
+
+  // ---- permissions before a freeze (first value wins, so a second freeze cannot overwrite it)
+  saveSnapshot(r: SnapshotRow) {
+    this.db
+      .prepare("INSERT OR IGNORE INTO freeze_snapshot (repo, kind, principal, permission, saved_at) VALUES (?,?,?,?,?)")
+      .run(r.repo, r.kind, r.principal, r.permission, new Date().toISOString());
+  }
+
+  snapshots(repo?: string): SnapshotRow[] {
+    const rows = (repo
+      ? this.db.prepare("SELECT * FROM freeze_snapshot WHERE repo = ? ORDER BY kind, principal").all(repo)
+      : this.db.prepare("SELECT * FROM freeze_snapshot ORDER BY repo, kind, principal").all()) as Record<string, unknown>[];
+    return rows.map((r) => ({ repo: String(r.repo), kind: String(r.kind) as SnapshotRow["kind"], principal: String(r.principal), permission: String(r.permission) }));
+  }
+
+  deleteSnapshot(repo: string, kind: string, principal: string) {
+    this.db.prepare("DELETE FROM freeze_snapshot WHERE repo = ? AND kind = ? AND principal = ?").run(repo, kind, principal);
+  }
+
+  // ---- mentors and judges
+  upsertReviewer(r: Omit<ReviewerRow, "updated_at">) {
+    this.db
+      .prepare(
+        `INSERT INTO reviewers (login, name, role, scope, teams, active, updated_at) VALUES (?,?,?,?,?,?,?)
+         ON CONFLICT(login) DO UPDATE SET name=excluded.name, role=excluded.role, scope=excluded.scope, teams=excluded.teams,
+           active=excluded.active, updated_at=excluded.updated_at`,
+      )
+      .run(r.login, r.name, r.role, r.scope, j(r.teams), r.active ? 1 : 0, new Date().toISOString());
+  }
+
+  reviewers(): ReviewerRow[] {
+    return (this.db.prepare("SELECT * FROM reviewers ORDER BY role, login").all() as Record<string, unknown>[]).map((r) => ({
+      login: String(r.login),
+      name: String(r.name),
+      role: String(r.role) as ReviewerRow["role"],
+      scope: String(r.scope) as ReviewerRow["scope"],
+      teams: p(r.teams, []),
+      active: Number(r.active) === 1,
+      updated_at: String(r.updated_at),
+    }));
   }
 
   // ---- event close
@@ -221,6 +293,8 @@ export class StateDb {
       audit_with_detail: n("SELECT COUNT(*) AS n FROM audit WHERE detail IS NOT NULL AND detail != 'null'"),
       audit_user_targets: n("SELECT COUNT(*) AS n FROM audit WHERE (target LIKE 'user:%' OR target LIKE '%/user:%') AND target NOT LIKE '%user:(removed)'"),
       app_request_requesters: n("SELECT COUNT(*) AS n FROM app_requests WHERE requester IS NOT NULL"),
+      reviewer_names: n("SELECT COUNT(*) AS n FROM reviewers WHERE name != ''"),
+      freeze_snapshot_rows: n("SELECT COUNT(*) AS n FROM freeze_snapshot"),
     };
   }
 
@@ -232,6 +306,8 @@ export class StateDb {
       this.db.exec("UPDATE audit SET target = 'user:(removed)' WHERE target LIKE 'user:%'");
       this.db.exec("UPDATE audit SET target = substr(target, 1, instr(target, '/user:') - 1) || '/user:(removed)' WHERE target LIKE '%/user:%'");
       this.db.exec("UPDATE app_requests SET requester = NULL");
+      this.db.exec("UPDATE reviewers SET name = ''");
+      this.db.exec("DELETE FROM freeze_snapshot");
       this.db.exec("COMMIT");
     } catch (err) {
       this.db.exec("ROLLBACK");
