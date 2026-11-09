@@ -109,13 +109,14 @@ function publicForm_() {
   return {
     ok: true,
     api: API_VERSION,
-    event: { title: EVENT.title, intro: EVENT.intro || '', privacy: EVENT.privacy || '', privacyUrl: EVENT.privacyUrl || '' },
+    event: { intro: EVENT.intro || '', privacy: EVENT.privacy || '', privacyUrl: EVENT.privacyUrl || '' },
     gate: gateState_(),
     sections: FORM.map(function (s) {
       return {
         name: s.name,
         hint: s.hint || '',
         optional: !!s.optional,
+        summary: s.summary || '',
         fields: (s.fields || []).map(function (f) {
           return {
             key: f.key, type: f.type || 'text', required: !!f.required, placeholder: f.placeholder || '',

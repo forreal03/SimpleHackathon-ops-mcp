@@ -9,4 +9,4 @@
 | [`team-readme.template.md`](team-readme.template.md) | 팀 repo | 트랙 템플릿 repo에 넣을 README. public 전환 전에 빈 섹션을 확인합니다 |
 | [`.env.example`](.env.example) | MCP | 환경 변수 목록(GitHub App, Google 인증, 작업 폴더) |
 
-신청 폼의 설정은 [`packages/forms/apps-script/Config.gs`](../packages/forms/apps-script/Config.gs)(질문·기간)와 [`packages/forms/site/config.js`](../packages/forms/site/config.js)(로그인 클라이언트 ID·서버 주소)에 있습니다.
+신청 페이지의 설정은 [`packages/forms/apps-script/Config.gs`](../packages/forms/apps-script/Config.gs)(질문·모집 기간)와 [`packages/forms/site/config.js`](../packages/forms/site/config.js)(로그인 클라이언트 ID·서버 주소, 대회 이름·신청 과정·유의사항·푸터)에 있습니다.

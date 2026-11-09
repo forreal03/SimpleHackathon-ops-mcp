@@ -1,0 +1,572 @@
+/*
+ * SimpleHackathon forms — 테마. ENDPoinT 2026 사이트(2026endpoint.github.io)의 스타일을 그대로 옮기고,
+ * 신청 화면에서 쓰지 않는 규칙(첫 화면·동아리·심사·팀 게시판·운영진)만 걷어 냈다.
+ * 색과 글꼴은 맨 위 :root 의 변수에서 바꾼다.
+ */
+:root{
+  --ink:#191919; --ink-2:#1F1F1F; --ink-3:#252525;
+  --paper:#FFFFFF; --paper-ink:#151515;
+  --fg:#E8E8E8; --dim:#A9A9A9; --dim-2:#828282;
+  --line:rgba(255,255,255,.16); --line-k:rgba(0,0,0,.13);
+  --blue:#6AA3F0; --blue-k:#00387F; --red:#E8636D; --red-k:#BA000C;
+  --font:"Gothic A1",-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",Pretendard,system-ui,sans-serif;
+  --ease:cubic-bezier(.22,.61,.36,1);
+  --hdr-rgb:23,23,23;
+  --gut:clamp(20px,5vw,76px);
+  --maxw:1340px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;background:linear-gradient(180deg,#171717 0%,#1A1A1A 30%,#1D1D1D 60%,#212121 85%,#242424 100%);background-repeat:no-repeat;min-height:100vh;-webkit-text-size-adjust:100%;text-size-adjust:100%;overflow-x:hidden}
+body{margin:0;color:var(--fg);font-family:var(--font);font-weight:300;font-size:16px;line-height:1.85;
+  letter-spacing:-.005em;-webkit-font-smoothing:antialiased;overflow-x:clip}
+  
+img{max-width:100%;display:block}
+h1,h2,h3{margin:0;font-weight:200;letter-spacing:-.02em;line-height:1.14;color:#fff}
+p{margin:0}
+a{color:inherit}
+strong,b{font-weight:500}
+.wrap{max-width:var(--maxw);margin:0 auto;padding-inline:var(--gut)}
+.lab{font-size:10.5px;letter-spacing:.26em;text-transform:uppercase;font-weight:500;color:var(--dim-2);display:inline-block}
+.lab.blue{color:var(--blue)}
+hr.rule{height:1px;background:var(--line);border:0;margin:0;transform-origin:left}
+
+/* ================= motion ================= */
+.js [data-anim]{opacity:0;transform:translateY(20px);
+  transition:opacity .95s var(--ease),transform .95s var(--ease);transition-delay:var(--d,0s)}
+.js [data-anim].in{opacity:1;transform:none}
+.js [data-anim="line"]{opacity:1;transform:scaleX(0);transition:transform 1.1s var(--ease);transition-delay:var(--d,0s)}
+.js [data-anim="line"].in{transform:scaleX(1)}
+.js [data-anim="mask"]{opacity:1;transform:none;overflow:hidden;display:block}
+.js [data-anim="mask"]>span{display:block;transform:translateY(112%);
+  transition:transform 1.05s var(--ease);transition-delay:var(--d,0s)}
+.js [data-anim="mask"].in>span{transform:none}
+.view{display:none}
+.view.on{display:block}
+.js .view.on{animation:viewIn .6s var(--ease) both}
+/* 떠오르는 움직임(translateY)은 뺐다 — 다른 화면에서 '일정' 등을 누르면 그 움직임 도중에 위치를 재서
+   제목이 헤더 밑으로 12px 숨었다 (1008) */
+@keyframes viewIn{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  [data-anim],[data-anim].in,[data-anim="mask"]>span{opacity:1!important;transform:none!important;transition:none!important;animation:none!important}
+  .view.on{animation:none}
+}
+
+/* ================= header ================= */
+header.top{position:sticky;top:0;z-index:60;background:rgba(var(--hdr-rgb),.78);
+  -webkit-backdrop-filter:blur(14px) saturate(140%);backdrop-filter:blur(14px) saturate(140%);
+  border-bottom:1px solid transparent;transition:border-color .4s var(--ease),background .4s var(--ease)}
+header.top.scrolled{border-bottom-color:var(--line);background:rgba(var(--hdr-rgb),.94)}
+.top-in{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;min-height:72px}
+.top-in>nav{justify-self:end}
+
+/* 헤더 가운데 로그인 위젯 — 사이트 전체의 로그인/로그아웃은 여기서 */
+.top-auth{display:flex;align-items:center;justify-content:center;min-height:36px}
+.top-auth[hidden]{display:none}   /* 모집 기간이 아닐 때. display:flex 가 기본 [hidden] 을 이기므로 */
+.top-auth .g-wide{display:block}
+.top-auth .g-icon{display:none}
+.top-auth .who{display:flex;align-items:center;gap:10px}
+.top-auth .who img{width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.06);flex-shrink:0}
+.top-auth .who .nm{font-size:13px;font-weight:400;color:#fff;max-width:14ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.top-auth .tiny{height:30px;padding:0 12px;border:1px solid rgba(255,255,255,.34);background:transparent;color:#fff;
+  font-family:var(--font);font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;transition:background .3s var(--ease),color .3s var(--ease)}
+.top-auth .tiny:hover{background:#fff;color:#151515}
+.top-auth .tiny.fill{background:#fff;color:#151515}
+.top-auth .tiny.fill:hover{background:var(--dim)}
+.mark{text-decoration:none;display:block;line-height:1.4}
+.mark b{display:block;font-size:16px;font-weight:400;letter-spacing:.01em;color:#fff}
+.mark span{display:block;font-size:9px;letter-spacing:.28em;text-transform:uppercase;color:var(--dim-2);font-weight:400}
+.top nav{display:flex;align-items:center;gap:0;flex-wrap:wrap;justify-content:flex-end}
+.top nav a{position:relative;font-size:13.5px;font-weight:400;color:var(--dim);text-decoration:none;padding:8px 14px;transition:color .3s var(--ease)}
+.top nav a::after{content:"";position:absolute;left:14px;right:14px;bottom:2px;height:1px;background:#fff;
+  transform:scaleX(0);transform-origin:right;transition:transform .45s var(--ease)}
+.top nav a:hover{color:#fff}
+.top nav a:hover::after,.top nav a.on::after{transform:scaleX(1);transform-origin:left}
+.top nav a.on{color:#fff}
+.top nav a.apply{margin-left:14px;background:#fff;color:#151515;font-weight:500;padding:11px 20px}
+.top nav a.apply::after{display:none}
+.top nav a.apply:hover{background:var(--dim)}
+/* 모집 기간 밖 — 흰 알약을 조용한 안내 라벨로 (자물쇠 아이콘이 들어가므로 inline-flex) */
+.top nav a.apply.gated{display:inline-flex;align-items:center;gap:6px;background:transparent;color:var(--dim-2);
+  border:1px solid var(--line);font-weight:400;cursor:default}
+.top nav a.apply.gated:hover{background:transparent;color:var(--dim-2)}
+.top nav a.apply.gated svg{opacity:.75}
+.progress{position:fixed;top:0;left:0;height:2px;width:100%;transform:scaleX(0);transform-origin:left;
+  background:linear-gradient(90deg,var(--blue),#fff);z-index:70;pointer-events:none}
+
+/* ================= page head ================= */
+.sub{font-size:15px;font-weight:300;line-height:1.95;color:var(--dim);max-width:54ch}
+.hero-cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;align-items:center}
+
+/* buttons */
+.btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:52px;padding:0 28px;
+  font-family:var(--font);font-size:14.5px;font-weight:500;letter-spacing:-.005em;text-decoration:none;cursor:pointer;
+  background:#fff;color:#151515;border:1px solid #fff;overflow:hidden;transition:color .4s var(--ease)}
+.btn span{position:relative;z-index:1}
+/* 모집 기간 밖 — 버튼을 눌리지 않는 안내 라벨로 바꾼다 (href 를 떼므로 포커스도 가지 않는다) */
+.btn.gated{background:transparent;color:var(--dim);border-color:var(--line);cursor:default;font-weight:300}
+.btn.gated::before{display:none}
+.btn.gated:hover{color:var(--dim)}
+.btn.gated svg{flex:0 0 auto;opacity:.75}
+.btn::before{content:"";position:absolute;inset:0;background:#151515;transform:translateY(101%);transition:transform .45s var(--ease)}
+.btn:hover{color:#fff}
+.btn:hover::before{transform:none}
+.btn-o{background:transparent;color:#fff;border-color:rgba(255,255,255,.4)}
+.btn-o::before{background:#fff}
+.btn-o:hover{color:#151515;border-color:#fff}
+
+/* sections */
+section{padding:clamp(60px,8.5vw,120px) 0;border-bottom:1px solid var(--line);scroll-margin-top:72px;position:relative;overflow:hidden}
+.head{display:grid;grid-template-columns:minmax(0,1.12fr) minmax(0,.74fr);gap:clamp(20px,4vw,68px);align-items:end;margin-bottom:clamp(30px,4vw,56px)}
+.head h2{font-size:clamp(26px,4vw,46px);font-weight:100;letter-spacing:-.035em}
+.head .lab{margin-bottom:18px}
+.head p{color:var(--dim);font-size:14.5px;line-height:1.95}
+
+/* 신청 과정 · 유의사항 */
+.slot{display:grid;grid-template-columns:210px minmax(0,1fr) minmax(0,1.2fr);gap:clamp(16px,3vw,48px);
+  padding:clamp(24px,3vw,36px) 0;border-top:1px solid var(--line);align-items:start;transition:background .45s var(--ease)}
+.slot:last-of-type{border-bottom:1px solid var(--line)}
+.slot time{font-size:14.5px;font-weight:400;color:var(--blue);letter-spacing:.02em;font-style:normal}
+.slot.fin time{color:var(--red)}
+.slot h3{font-size:clamp(20px,2.3vw,28px);font-weight:200;letter-spacing:-.025em;word-break:keep-all}
+.slot p{font-size:14.5px;line-height:1.95;color:var(--dim);font-weight:300}
+@keyframes faqIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+
+footer{padding:clamp(44px,5vw,72px) 0 clamp(52px,6vw,80px);color:var(--dim-2);font-size:13px;line-height:1.95;font-weight:300}
+footer .f-in{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:32px;align-items:start}
+footer a{color:var(--dim);text-decoration:none;display:block;transition:color .3s var(--ease)}
+footer a:hover{color:#fff}
+.f-links{display:flex;gap:30px;flex-wrap:wrap}
+.f-legal{display:flex;gap:24px;flex-wrap:wrap;margin-top:22px;font-size:12.5px}
+.f-legal a{display:inline}
+.f-legal a.pp{color:#fff;font-weight:500}
+.host{display:flex;align-items:center;gap:22px;margin-top:30px;padding-top:26px;border-top:1px solid var(--line);flex-wrap:wrap}
+
+.dept{display:flex;align-items:center;gap:15px;flex-wrap:wrap}
+.dept-name,.dept-sub{font-size:17px;font-weight:600;color:#fff;letter-spacing:-.02em;line-height:1.2}
+.dept-bar{width:1px;height:19px;background:rgba(255,255,255,.34)}
+@media (max-width:560px){
+  .dept{gap:11px}
+  .dept-name,.dept-sub{font-size:14.5px}
+  .dept-bar{height:15px}
+}
+
+/* 페이지 머리 오른쪽 칸 */
+.stack{border:1px solid var(--line)}
+.stack>div{padding:22px 24px;border-bottom:1px solid var(--line)}
+.stack>div:last-child{border-bottom:0}
+.stack b{display:block;font-size:16px;font-weight:200;color:#fff;margin-top:6px}
+
+/* ==============================================================
+   로딩 표시 — 안드로이드 킷캣(Holo)의 원형 인디케이터.
+   원 전체가 일정하게 돌고, 그 위에서 호가 늘었다 줄었다 한다.
+   회색 한 톤이라 어느 배경에 놓아도 튀지 않는다.
+   ============================================================== */
+.spin{display:inline-block;width:26px;height:26px;flex-shrink:0;
+  animation:spin-rot 2s linear infinite;transform-origin:50% 50%}
+.spin circle{fill:none;stroke:#8A8A8A;stroke-width:3.2;stroke-linecap:butt;
+  stroke-dasharray:6 120;stroke-dashoffset:0;
+  animation:spin-arc 1.5s ease-in-out infinite}
+.spin.sm{width:16px;height:16px}
+.spin.sm circle{stroke-width:4.4}
+.spin.ink circle{stroke:currentColor}
+@keyframes spin-rot{to{transform:rotate(360deg)}}
+/* 호가 짧게 시작해 4분의 3까지 자랐다가 다시 오므라든다 — 아주 사라지지는 않는다 */
+@keyframes spin-arc{
+  0%  {stroke-dasharray:6 120;stroke-dashoffset:0}
+  50% {stroke-dasharray:56 120;stroke-dashoffset:-20}
+  100%{stroke-dasharray:56 120;stroke-dashoffset:-70}
+}
+/* 로딩 한 줄 — 표시 + 설명 */
+.loading{display:flex;align-items:center;gap:12px;
+  font-size:13.5px;font-weight:300;color:var(--dim);padding:10px 0}
+/* 버튼 안에 들어갈 때 */
+.btn .spin{margin-right:8px;vertical-align:-2px}
+@media (prefers-reduced-motion:reduce){
+  .spin{animation-duration:3.4s}
+  .spin circle{animation:none;stroke-dasharray:38 120}
+}
+
+/* 모집 기간 안내 — 신청서 자리에 대신 뜬다 */
+.gatebox[hidden]{display:none}
+.gatebox{border:1px solid var(--line);padding:clamp(30px,4vw,52px);margin-top:clamp(20px,2.6vw,30px);
+  display:flex;flex-direction:column;gap:11px;align-items:flex-start}
+.gatebox b{font-size:clamp(20px,2.6vw,27px);font-weight:200;color:#fff;letter-spacing:-.02em;line-height:1.24}
+.gatebox p{font-size:14px;color:var(--dim);font-weight:300;max-width:58ch}
+.gatebox .when{font-size:12.5px;color:var(--dim-2);letter-spacing:.04em}
+.gatebox .row{margin-top:10px}
+/* 로컬에서만 보이는 미리보기 안내 (배포된 사이트에는 뜨지 않는다) */
+.gatedev{margin-top:14px;padding:12px 14px;border:1px dashed rgba(106,163,240,.45);font-size:12.5px;color:var(--dim);line-height:1.8}
+.gatedev code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--blue)}
+
+.pagehead{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,.7fr);gap:clamp(24px,4vw,60px);align-items:start}
+h1.ptitle{font-size:clamp(32px,5vw,58px);font-weight:100;letter-spacing:-.04em}
+
+@media (max-width:1060px){
+  .head,.pagehead{grid-template-columns:1fr}
+  .slot{grid-template-columns:160px minmax(0,1fr)}
+  .slot p{grid-column:2}
+  }
+@media (max-width:720px){
+  .slot{grid-template-columns:1fr;gap:10px}
+  .slot p{grid-column:1}
+  .top nav a{padding:7px 8px;font-size:12.5px}
+  .top nav a.apply{padding:10px 14px;margin-left:6px}
+  .top nav a.sm-hide{display:none}
+  .mark span{display:none}
+  /* 좁은 화면: 양옆은 제 너비만 쓰고 가운데 위젯이 남은 공간 중앙에 온다 (메뉴가 줄바꿈되지 않게) */
+  .top-in{min-height:60px;gap:8px;grid-template-columns:auto 1fr auto}
+  /* 좁은 화면: 가운데에는 G 아이콘 또는 아바타+로그아웃만 */
+  .top-auth .g-wide{display:none}
+  .top-auth .g-icon{display:block}
+  .top-auth .who .nm{display:none}
+  .top-auth .who{gap:6px}
+  .top-auth .tiny{padding:0 9px;font-size:11.5px;height:28px}
+}
+@media (max-width:400px){
+  /* 아주 좁은 화면: 큰 버튼은 한 줄에 하나씩 */
+  .hero-cta .btn{flex:1 1 100%}
+  footer .f-in{grid-template-columns:1fr}
+}
+
+/* ================= apply form ================= */
+.af{border:1px solid var(--line);margin-top:clamp(20px,2.6vw,30px);scroll-margin-top:92px}
+
+/* 로그인 게이트 */
+.af-gate{padding:clamp(24px,3vw,36px);display:flex;align-items:center;justify-content:space-between;
+  gap:clamp(18px,2.4vw,34px);flex-wrap:wrap;border-bottom:1px solid var(--line)}
+.af-gate .t{display:flex;flex-direction:column;gap:7px;min-width:min(100%,32ch)}
+.af-gate .t b{font-size:clamp(17px,2vw,21px);font-weight:200;color:#fff;letter-spacing:-.02em}
+.af-gate .t span{font-size:13.5px;color:var(--dim);font-weight:300;line-height:1.8}
+.af-who{display:flex;align-items:center;gap:13px}
+.af-who img{width:38px;height:38px;border-radius:50%;flex-shrink:0;background:rgba(255,255,255,.05)}
+.af-who .m{display:flex;flex-direction:column;line-height:1.5;min-width:0}
+.af-who .m b{font-size:15px;font-weight:400;color:#fff}
+.af-who .m span{font-size:12.5px;color:var(--dim-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.af-out{background:none;border:0;padding:0;margin-top:2px;cursor:pointer;font-family:var(--font);
+  font-size:12px;color:var(--dim-2);text-decoration:underline;text-underline-offset:3px;align-self:flex-start;
+  transition:color .3s var(--ease)}
+.af-out:hover{color:#fff}
+
+/* 신청 상태 띠 — 이미 낸 신청서를 보고 있을 때 */
+.af-state{padding:16px clamp(20px,2.6vw,28px);border-bottom:1px solid var(--line);
+  display:flex;align-items:center;gap:8px 16px;flex-wrap:wrap;background:rgba(106,163,240,.07)}
+.af-state.edit{background:rgba(232,99,109,.08)}
+.af-state .lab{color:var(--blue)}
+.af-state.edit .lab{color:var(--red)}
+.af-state b{font-size:14.5px;font-weight:400;color:#fff}
+.af-state i{font-style:normal;font-size:13px;color:var(--dim)}
+
+/* 제출 바의 버튼들 */
+.af-acts{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.af-acts .btn[hidden]{display:none}
+
+/* 조회 모드 — 값은 또렷하게 두고 입력만 막는다 */
+.af.ro .tin:disabled,.af.ro .tar:disabled{opacity:1;color:#fff;-webkit-text-fill-color:#fff}
+.af.ro select.tin:disabled{background-image:none}
+.af.ro .opt input:disabled+span{opacity:1;cursor:default}
+.af.ro .opt input:disabled:not(:checked)+span{opacity:.28}
+.af.ro .chipset,.af.ro .qhint{display:none}
+.af.ro .fld-pad{padding-top:clamp(16px,2vw,22px)}
+
+/* 진행률 */
+.af-prog{display:flex;align-items:center;gap:14px;padding:16px clamp(20px,2.6vw,28px);border-bottom:1px solid var(--line)}
+.af-prog .t{flex:1;height:2px;background:rgba(255,255,255,.12);overflow:hidden}
+.af-prog .f{display:block;height:100%;width:0;background:var(--blue);transition:width .6s var(--ease)}
+.af-prog .n{font-size:11px;letter-spacing:.2em;color:var(--dim-2);font-weight:500;white-space:nowrap}
+
+/* 필드 */
+.fld{border-bottom:1px solid var(--line);transition:background .4s var(--ease)}
+.fld:last-of-type{border-bottom:0}
+.fld-hd{display:flex;align-items:center;gap:clamp(12px,1.8vw,22px);width:100%;text-align:left;
+  background:none;border:0;padding:20px clamp(20px,2.6vw,28px);cursor:pointer;font-family:var(--font);
+  color:inherit;transition:background .4s var(--ease)}
+.fld.pin>.fld-hd{background:rgba(255,255,255,.05)}
+@media (hover:hover) and (pointer:fine){ html:not(.touch) .fld-hd:hover{background:rgba(255,255,255,.05)} }
+.fld-hd:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
+.fld-no{font-size:11px;letter-spacing:.2em;font-weight:500;color:var(--dim-2);flex-shrink:0;width:22px}
+.fld-name{font-size:15.5px;font-weight:400;color:#fff;letter-spacing:-.01em;flex-shrink:0}
+.fld-name .req{color:var(--red);margin-left:5px;font-weight:300}
+.fld-val{margin-left:auto;font-size:13.5px;font-weight:300;color:var(--dim-2);text-align:right;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.fld.done .fld-val{color:var(--fg)}
+.fld.bad .fld-val{color:var(--red)}
+.fld-mark{flex-shrink:0;width:9px;height:9px;border:1px solid var(--line);transition:all .4s var(--ease)}
+.fld.done .fld-mark{background:var(--blue);border-color:var(--blue)}
+.fld.bad .fld-mark{background:var(--red);border-color:var(--red)}
+.fld.pin .fld-mark{transform:rotate(45deg)}
+
+/* 펼침 — hover 미리보기 / 클릭 고정 */
+.fld-bd{display:grid;grid-template-rows:0fr;opacity:0;
+  transition:grid-template-rows .5s var(--ease),opacity .38s var(--ease)}
+.fld-in{overflow:hidden;min-height:0}
+.fld-pad{padding:clamp(20px,2.4vw,28px) clamp(20px,2.6vw,28px) clamp(24px,2.8vw,32px);
+  display:flex;flex-direction:column;gap:clamp(18px,2vw,22px)}
+@media (hover:hover) and (pointer:fine){
+  html:not(.touch) .af:not(.locked) .fld:hover>.fld-bd{grid-template-rows:1fr;opacity:1}
+}
+.af:not(.locked) .fld-bd:focus-within,
+.af:not(.locked) .fld.pin>.fld-bd{grid-template-rows:1fr;opacity:1}
+.af.locked .fld-hd{cursor:not-allowed;opacity:.5}
+
+/* 입력 요소 */
+.qhint{font-size:13px;color:var(--dim);font-weight:300;line-height:1.8}
+.qgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px clamp(20px,2.6vw,34px)}
+.q{display:flex;flex-direction:column;gap:5px;min-width:0}
+.q>.lab{color:var(--dim-2);letter-spacing:.1em;font-size:11px}
+.q>.lab .req{color:var(--red);margin-left:4px;letter-spacing:0}
+.tin,.tar{width:100%;background:transparent;border:0;border-bottom:1px solid var(--line);color:#fff;
+  font-family:var(--font);font-size:15px;font-weight:300;padding:9px 0;letter-spacing:-.005em;
+  transition:border-color .35s var(--ease)}
+.tar{resize:vertical;min-height:88px;line-height:1.8}
+.tin:focus,.tar:focus{outline:none;border-bottom-color:var(--blue)}
+.tin::placeholder,.tar::placeholder{color:#5E5E5E}
+.tin[aria-invalid="true"],.tar[aria-invalid="true"]{border-bottom-color:var(--red)}
+.tin:disabled,.tar:disabled{opacity:.4}
+select.tin{appearance:none;-webkit-appearance:none;cursor:pointer;
+  background:linear-gradient(45deg,transparent 50%,var(--dim) 50%) calc(100% - 9px) 55%/6px 6px no-repeat}
+
+.opts{display:flex;flex-wrap:wrap;gap:8px}
+.opt{position:relative;display:inline-flex}
+.opt input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.opt span{display:inline-flex;align-items:center;min-height:40px;padding:0 16px;border:1px solid var(--line);
+  font-size:13px;color:var(--dim);font-weight:300;cursor:pointer;user-select:none;
+  transition:color .3s var(--ease),border-color .3s var(--ease),background .3s var(--ease)}
+.opt span:hover{color:#fff;border-color:rgba(255,255,255,.38)}
+.opt input:checked+span{background:#fff;color:#151515;border-color:#fff;font-weight:500}
+.opt input:focus-visible+span{outline:2px solid var(--blue);outline-offset:2px}
+.opt input:disabled+span{opacity:.4;cursor:not-allowed}
+.opt.no input:checked+span{background:var(--red);border-color:var(--red);color:#fff}
+.chipin{min-height:36px;padding:0 14px;border:1px solid var(--line);background:transparent;cursor:pointer;
+  font-family:var(--font);font-size:12.5px;color:var(--dim-2);font-weight:300;
+  transition:color .3s var(--ease),border-color .3s var(--ease),background .3s var(--ease)}
+.chipin:hover{color:#fff;border-color:rgba(255,255,255,.38)}
+.chipin[aria-pressed="true"]{background:#fff;color:#151515;border-color:#fff;font-weight:500}
+.chipset{margin-bottom:2px}
+.q.full{grid-column:1/-1}
+
+/* 제출 */
+.af-send{padding:clamp(22px,2.8vw,32px) clamp(20px,2.6vw,28px);display:flex;align-items:center;
+  justify-content:space-between;gap:18px;flex-wrap:wrap;border-top:1px solid var(--line);background:rgba(255,255,255,.028);
+  transition:background .5s var(--ease)}
+.af-send .t{font-size:13.5px;color:var(--dim);font-weight:300;line-height:1.8;max-width:56ch}
+.af-send .t b{color:#fff;font-weight:400}
+.af-legal{margin-top:6px;font-size:12.5px;color:var(--dim-2)}
+.af-legal a,.af-gate a{color:var(--dim);text-underline-offset:3px;transition:color .3s var(--ease)}
+.af-legal a:hover,.af-gate a:hover{color:#fff}
+.af-send.ready{background:rgba(255,255,255,.055)}
+.btn[disabled]{opacity:.34;pointer-events:none}
+.af-msg{font-size:13.5px;font-weight:300;line-height:1.8;padding:14px clamp(20px,2.6vw,28px);
+  border-top:1px solid var(--line);display:none}
+.af-msg.on{display:block;animation:faqIn .4s var(--ease) both}
+.af-msg.err{color:var(--red)}
+.af-msg.ok{color:var(--blue)}
+
+/* 완료 화면 */
+.af-done{border:1px solid var(--line);padding:clamp(30px,4vw,52px);display:none;
+  flex-direction:column;gap:16px;margin-top:clamp(20px,2.6vw,30px)}
+.af-done.on{display:flex;animation:faqIn .55s var(--ease) both}
+.af-done h3{font-size:clamp(23px,3vw,34px);font-weight:100;letter-spacing:-.035em}
+.af-done p{font-size:14.5px;line-height:1.95;color:var(--dim);font-weight:300;max-width:60ch}
+.af-recap{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));margin-top:8px}
+.af-recap>div{box-shadow:0 0 0 1px var(--line);padding:16px 18px;display:flex;flex-direction:column;gap:5px}
+.af-recap b{font-size:14.5px;font-weight:400;color:#fff;line-height:1.6}
+
+@media (max-width:720px){
+  .qgrid,.af-recap{grid-template-columns:1fr}
+  .fld-hd{flex-wrap:wrap;gap:8px 12px;padding:18px 20px}
+  .fld-val{margin-left:0;flex-basis:100%;text-align:left;white-space:normal;order:3}
+  .fld-mark{margin-left:auto;order:2}
+  .af-send .btn{flex:1 1 100%}
+}
+
+/* ================= design pass · 0922 ================= */
+/* display:flex 등이 hidden 속성을 이겨서 빈 띠가 보이던 문제 (신청서 상태 띠 등) */
+[hidden]{display:none!important}
+p{text-wrap:pretty}
+/* 한글 라벨은 넓은 자간을 풀어 준다 (영문 대문자용 자간이 한글에선 글자가 흩어져 보임) */
+.lab.ko{letter-spacing:.05em;text-transform:none;font-size:11.5px}
+/* 헤더: 로그인 위젯을 가운데에서 오른쪽 끝으로 */
+.top-in{display:flex;justify-content:flex-start}
+.top-in>nav{margin-left:auto}
+.top-auth{order:3;margin-left:18px;justify-content:flex-end}
+.top-auth .qhint{display:none}
+@media (max-width:720px){ .top-auth{display:none} }
+
+/* 로그인 위젯이 비어 있으면(구글 스크립트 차단 등) 자리도 차지하지 않게 */
+.top-auth:not(:has(.who,iframe,button)){display:none}
+
+/* 인앱 브라우저(카카오톡 등) 안내 띠 */
+.inapp{border-bottom:1px solid var(--line);background:#1F2328}
+.inapp .wrap{display:flex;align-items:center;gap:10px 18px;flex-wrap:wrap;padding-block:12px}
+.inapp p{font-size:13px;line-height:1.6;color:var(--fg);flex:1 1 280px}
+.inapp p b{color:#fff;font-weight:500}
+.inapp .btn{min-height:38px;padding:0 16px;font-size:12.5px}
+.inapp .x{background:none;border:0;color:var(--dim);font-size:18px;line-height:1;cursor:pointer;padding:6px}
+
+/* footer 아이콘 링크 · 주최 링크 */
+.f-links a.ilink{display:inline-flex;align-items:center;gap:8px}
+.f-links .ico{flex-shrink:0;opacity:.9}
+.dept-link{display:inline-flex!important;align-items:center;gap:15px;color:#fff!important}
+.dept-link .dept-name,.dept-link .dept-sub{text-decoration:underline;text-decoration-color:transparent;text-underline-offset:5px;text-decoration-thickness:1px;transition:text-decoration-color .3s var(--ease)}
+.dept-link:hover .dept-name,.dept-link:hover .dept-sub,.dept-link:focus-visible .dept-name,.dept-link:focus-visible .dept-sub{text-decoration-color:rgba(255,255,255,.55)}
+@media (max-width:560px){.dept-link{gap:11px}}
+
+/* ================= 가독성 정리 (1007b) =================
+   색은 그대로 두고 줄바꿈·글자 굵기·크기·어색하게 남는 칸만 손본다 */
+/* 한글은 어절 단위로 줄을 바꾼다 ("최/대 120명" 처럼 단어 중간에서 끊기지 않게).
+   break-word 는 한 줄에 다 안 들어가는 긴 주소·영단어만 끊는다 (anywhere 는 좁은 칸에서
+   멀쩡한 영어 단어까지 "HACKATHO/N" 처럼 잘라서 쓰지 않는다) */
+body{word-break:keep-all;overflow-wrap:break-word}
+h1,h2,h3{text-wrap:balance}
+/* 아주 작던 글자를 조금 키운다 */
+.lab{font-size:11.5px}
+.mark span{font-size:10px}
+/* 본문은 15px, 줄 간격은 1.95 에서 1.8 로 — 너무 성기면 문단이 한눈에 안 들어온다 */
+.sub,.head p,.slot p,.af-done p{font-size:15px;line-height:1.8}
+.sub{line-height:1.85}
+.lab.ko{font-size:12px}
+
+/* 태블릿 폭(721~1060)에서 헤더가 두 줄로 깨지던 것 — 메뉴 일곱 개와 넓은 로그인 버튼, 로고 부제가
+   한 줄에 안 들어가 'EN·참가 신청' 이 아래로 떨어지고 부제가 세 줄로 접혔다.
+   휴대폰에서 이미 쓰는 압축형(G 아이콘만, 부제 없음)을 이 폭까지 넓힌다 */
+@media (max-width:1060px){
+  .top .mark span{display:none}
+  .top-auth .g-wide{display:none}
+  .top-auth .g-icon{display:block}
+  .top-auth .who .nm{display:none}
+  .top-auth .who{gap:6px}
+  .top-auth{margin-left:10px}
+}
+@media (min-width:721px) and (max-width:1060px){
+  .top nav{flex-wrap:nowrap}
+  .top nav a{padding:8px 10px}
+  .top nav a::after{left:10px;right:10px}
+  .top nav a.apply{padding:11px 18px;margin-left:10px}
+}
+
+@media (max-width:720px){
+  /* 얇은 글자(100~300)는 작은 화면에서 획이 끊겨 보인다. 본문은 400, 제목은 한 단계 두껍게 */
+  .sub,.head p,.slot p,.af-done p,
+  .qhint,.gatebox p,.af-gate .t span,.af-send .t,.opt span,.tin,.tar{font-weight:400}
+  .head h2,h1.ptitle,.af-done h3{font-weight:200}
+  .slot h3,.af-gate .t b,.gatebox b,.stack b{font-weight:300}
+}
+
+/* --- 공통 ------------------------------------------------------------------ */
+/* 메뉴 글자와 로고는 한 덩어리 — 폭이 모자라도 'Team / board', 'ENDPoin / T' 처럼 안쪽에서 꺾이지 않게 */
+.top nav a,.mark b,.mark span{white-space:nowrap}
+
+/* 신청서 로그인 안내가 폼 폭 전체(한 줄 100자 이상)로 늘어나던 것 — 읽기 좋은 폭에서 끊고,
+   구글 버튼이 그 오른쪽에 오게 한다 */
+.af-gate .t{max-width:60ch}
+.af-gate .t span{text-wrap:balance}   /* 마지막 줄에 '바랍니다.' 만 남지 않게 */
+.qhint{max-width:72ch}
+/* break-word 는 칸의 최소 폭을 줄이지 않아, 사람이 쓴 긴 링크·메일 하나가 1fr 칸이나 flex 항목을 화면 밖까지
+   넓혔다. 칸을 화면 폭에 묶어 두면 break-word 가 그 안에서 끊는다 */
+@media (max-width:720px){.af-recap{grid-template-columns:minmax(0,1fr)}}
+.inapp p{min-width:0}
+
+/* 내용이 짧은 화면(모집 기간 밖 등)에서 푸터가 화면 중간에 떠 있지 않게 */
+body{display:flex;flex-direction:column;min-height:100vh}
+body>footer{margin-top:auto}
+/* 짧은 페이지로 옮겨 스크롤바가 사라질 때 화면 전체가 옆으로 7px 씩 움찔하지 않게 */
+html{scrollbar-gutter:stable}
+/* 그 확보된 자리는 html 의 그라데이션 그림 밖이라 흰 띠(15px)로 보였다 — 그라데이션 가운데 색을 바탕색으로 */
+html{background-color:#1D1D1D}
+
+/* --- 가로로 든 휴대폰: 세로가 짧아 버튼이 화면 밖으로 밀리지 않게 ----------- */
+@media (max-width:1060px) and (max-height:540px) and (orientation:landscape){
+  .top-in{min-height:60px}
+  .hero-cta{margin-top:2px}
+  .hero-cta .btn{padding:0 20px}
+}
+/* --- 헤더 ------------------------------------------------------------------ */
+
+/* 손가락으로 누르기 쉽게 — 메뉴 글자·언어 버튼을 40px 이상으로 (헤더 높이는 그대로) */
+@media (max-width:720px){
+  .top nav a{padding-block:10px}
+}
+
+/* --- 일정 · 신청 단계 ------------------------------------------------------ */
+/* 넓은 화면: 절 머리의 안내 문장이 아래 설명 칸보다 오른쪽으로 30~40px 비켜 있던 것을 같은 칸에 맞춘다 */
+@media (min-width:1061px){
+  .head:has(+ .slot){grid-template-columns:210px minmax(0,1fr) minmax(0,1.2fr);column-gap:clamp(16px,3vw,48px)}
+  .head:has(+ .slot)>div{grid-column:1 / 3}
+  .head:has(+ .slot)>p{grid-column:3}
+}
+/* 태블릿 2단(날짜 | 제목·설명): 날짜를 두 줄에 걸쳐 두어 제목과 설명 사이가 벌어지지 않게 */
+@media (min-width:721px) and (max-width:1060px){
+  .slot{row-gap:8px}
+  .slot time{grid-row:1 / span 2}
+}
+
+/* --- 신청서 · 페이지 머리 -------------------------------------------------- */
+@media (min-width:561px) and (max-width:1060px){
+  /* 모집 기간·팀 규모·정원 세 칸이 한 단으로 길게 쌓이던 것을 가로 세 칸으로 */
+  .pagehead>.stack{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .pagehead>.stack>div{border-bottom:0;border-left:1px solid var(--line)}
+  .pagehead>.stack>div:first-child{border-left:0}
+  /* 라벨 하나가 두 줄이 되어도(영어 'RECRUITMENT PERIOD') 세 값이 같은 높이에 */
+  .pagehead>.stack>div{display:flex;flex-direction:column}
+  .pagehead>.stack .lab{align-self:flex-start}
+  .pagehead>.stack b{margin-top:auto;padding-top:6px}
+}
+@media (min-width:561px) and (max-width:720px){.pagehead>.stack>div{padding-inline:16px}}
+@media (max-width:720px){
+  /* 긴 항목 이름(영어)이 번호 밑으로 떨어지지 않고 번호 옆에서 줄바꿈되게 */
+  .fld-name{flex:1 1 0;min-width:0}
+  /* 제출 버튼을 다른 큰 버튼들처럼 꽉 차게 (기존 규칙은 버튼의 부모를 잘못 짚고 있었다) */
+  .af-acts{flex:1 1 100%}
+  .af-acts .btn{flex:1 1 auto}
+}
+/* 마지막 줄에 한 단어만 남지 않게 ('… team / here.', 'Tech stack and development / experience') */
+.fld-name{text-wrap:balance}
+@media (max-width:560px){
+  /* 읽어야 하는 작은 글자는 12px 아래로 두지 않는다 */
+  .q>.lab,.fld-no,.af-prog .n{font-size:12px}
+}
+
+/* --- 푸터 ------------------------------------------------------------------ */
+@media (max-width:720px){
+  .f-links a{padding-block:8px}
+  .f-legal{margin-top:12px}
+  .f-legal a{display:inline-block;padding-block:8px}
+}
+@media (pointer:coarse){
+  .f-links a{padding-block:8px}
+  .f-legal a{display:inline-block;padding-block:8px}
+  .dept-link{min-height:40px}
+}
+@media (max-width:560px){footer .f-in{grid-template-columns:1fr}}
+.dept-name,.dept-sub{text-wrap:balance}
+
+/* --- 큰 모니터 (FHD · QHD · 4K) -------------------------------------------- */
+/* 1340px 단이 넓은 화면에서 가는 띠처럼 보이고 글자가 작아지던 것. 넓은 화면에서 단 폭과 글자를 단계적으로 키운다.
+   단계를 잘게 나눈 것은 브라우저 확대(Ctrl +)를 할 때 글자가 오히려 작아지는 구간이 없게 하려는 것이다.
+   html·body 에는 zoom 을 걸지 않는다 — 진행 막대가 재는 body.scrollHeight 가 배율 전 값으로 나온다.
+   zoom 을 모르는 브라우저는 @supports 에서 통째로 건너뛰어 지금 모습 그대로다. */
+@supports (zoom:1){
+  @media (min-width:1800px) and (min-height:860px){:root{--z:1.1}}
+  @media (min-width:2200px) and (min-height:1100px){:root{--z:1.2}}
+  @media (min-width:2600px) and (min-height:1300px){:root{--z:1.3}}
+  @media (min-width:3000px) and (min-height:1500px){:root{--z:1.4}}
+  @media (min-width:3400px) and (min-height:1700px){:root{--z:1.47}}
+  @media (min-width:3800px) and (min-height:1900px){:root{--z:1.59}}
+  @media (min-width:4800px) and (min-height:2600px){:root{--z:1.74}}
+
+  @media (min-width:1800px) and (min-height:860px){
+    body>header.top,body>.inapp,body>footer,
+    main.view>*{zoom:var(--z)}
+    .progress{height:calc(2px * var(--z))}
+  }
+}
+
+/* ================= SimpleHackathon additions ================= */
+/* GitHub 아이디 칸 아래 확인 줄 — 맞으면 프로필 링크, 형식이 틀리면 까닭 */
+.gh-check:empty{display:none}
+.gh-check a{color:var(--blue);text-underline-offset:3px}
+.gh-check.bad{color:var(--red)}
+/* 안내문 속 링크 */
+.qhint a{color:var(--fg);text-underline-offset:3px;transition:color .3s var(--ease)}
+.qhint a:hover{color:#fff}

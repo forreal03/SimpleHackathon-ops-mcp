@@ -1,23 +1,112 @@
 <!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="referrer" content="strict-origin-when-cross-origin">
-  <title>참가 신청</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#191919">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<script>document.documentElement.className+=" js";</script>
+<title>참가 신청</title>
+<!-- 탭 아이콘과 링크 미리보기 카드는 대회마다 넣어 주세요
+<link rel="icon" href="assets/img/icon-192.png" sizes="192x192" type="image/png">
+<meta property="og:title" content="">
+<meta property="og:image" content="">
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@100;200;300;400;500;600;700&display=swap">
+<link rel="preconnect" href="https://accounts.google.com">
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://script.googleusercontent.com">
+<link rel="stylesheet" href="assets/theme.css">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-  <main id="app" class="wrap" aria-live="polite">
-    <p class="loading">신청서를 불러오는 중…</p>
-  </main>
-  <noscript><p class="wrap">이 신청서는 자바스크립트가 필요합니다.</p></noscript>
-  <footer class="wrap foot">
-    <a href="https://github.com/forreal03/SimpleHackathon-ops-mcp" rel="noopener noreferrer">SimpleHackathon-ops</a>
-  </footer>
-  <script src="config.js"></script>
-  <script src="demo-form.js"></script>
-  <script src="app.js"></script>
+
+<noscript><style>[data-anim]{opacity:1!important;transform:none!important}[data-anim="mask"]>span{transform:none!important}</style></noscript>
+<div class="progress" id="progress"></div>
+
+<header class="top" id="top-bar">
+  <div class="wrap top-in">
+    <a class="mark" id="brand" href="#top"><b></b><span></span></a>
+    <div class="top-auth" id="top-auth" aria-live="polite"></div>
+    <nav id="nav">
+      <a class="apply" id="nav-apply" href="#af" data-gate="apply">참가 신청</a>
+    </nav>
+  </div>
+</header>
+
+<div class="inapp" id="inapp" hidden>
+  <div class="wrap">
+    <p><b>앱 안의 브라우저에서는 구글 로그인이 막혀 있어요.</b> 참가 신청은 Chrome이나 Safari에서 열어 주세요.</p>
+    <a class="btn" id="inapp-open" href="#"><span>외부 브라우저로 열기</span></a>
+    <button class="x" type="button" id="inapp-x" aria-label="안내 닫기">×</button>
+  </div>
+</div>
+
+<main id="v-apply" class="view on">
+  <section id="top">
+    <div class="wrap">
+      <div class="pagehead">
+        <div>
+          <span class="lab blue" data-anim id="head-tag"></span>
+          <h1 class="ptitle" style="margin-top:16px"><span data-anim="mask"><span id="head-title"></span></span></h1>
+          <p class="sub" data-anim style="--d:.15s;margin-top:20px;max-width:64ch" id="head-sub"></p>
+          <div class="hero-cta" data-anim style="--d:.25s;margin-top:28px" id="head-cta">
+            <a class="btn" href="#af" data-gate="apply"><span>신청서 작성하기</span></a>
+          </div>
+        </div>
+        <div class="stack" data-anim style="--d:.3s" id="head-stats"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="steps">
+    <div class="wrap">
+      <div class="head"><div><span class="lab blue" data-anim></span><h2><span data-anim="mask"><span></span></span></h2></div></div>
+    </div>
+  </section>
+
+  <section id="notices">
+    <div class="wrap">
+      <div class="head"><div><span class="lab blue" data-anim></span><h2><span data-anim="mask"><span></span></span></h2></div></div>
+    </div>
+  </section>
+
+  <section id="form" style="border-bottom:0">
+    <div class="wrap">
+      <div class="head"><div><span class="lab blue" data-anim></span><h2><span data-anim="mask"><span></span></span></h2></div></div>
+
+      <!-- 모집 기간이 아니면 신청서 대신 이 안내가 뜬다 -->
+      <div class="gatebox" id="af-gate" data-anim hidden></div>
+
+      <div class="af locked" id="af" data-anim></div>
+      <div class="af-done" id="af-done"></div>
+
+      <noscript>
+        <p class="sub" style="margin-top:24px">신청서 작성에는 자바스크립트가 필요합니다. 브라우저 설정을 확인한 뒤 다시 열어주세요.</p>
+      </noscript>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <hr class="rule" data-anim="line" style="margin-bottom:clamp(30px,4vw,46px)">
+    <div class="f-in">
+      <div>
+        <div class="mark" id="foot-mark" style="margin-bottom:16px"><b></b><span></span></div>
+        <div id="foot-lines"></div>
+      </div>
+      <div class="f-links" id="foot-links"></div>
+    </div>
+    <div id="foot-hosts"></div>
+    <div class="f-legal" id="foot-legal"></div>
+  </div>
+</footer>
+
+<script src="config.js"></script>
+<script src="demo-form.js"></script>
+<script src="assets/app.js"></script>
 </body>
 </html>

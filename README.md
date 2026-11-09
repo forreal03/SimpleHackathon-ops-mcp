@@ -19,14 +19,14 @@
 
 | 폴더 | 무엇 | 스택 |
 | --- | --- | --- |
-| [`packages/forms`](packages/forms) | 참가 신청 폼. GitHub 아이디까지 받고, 서버가 기간·입력을 검사해 구글 시트에 씁니다 | HTML·CSS·JS(빌드 없음), GitHub Pages, Google Apps Script, Google Sheets |
+| [`packages/forms`](packages/forms) | 참가 신청 페이지. ENDPoinT 사이트의 신청 화면을 디자인 그대로 옮겼습니다. GitHub 아이디까지 받고, 서버가 기간·입력을 검사해 구글 시트에 씁니다 | HTML·CSS·JS(빌드 없음), GitHub Pages, Google Apps Script, Google Sheets |
 | [`packages/mcp`](packages/mcp) | MCP 서버 [`simple-hackathon-ops-mcp`](https://www.npmjs.com/package/simple-hackathon-ops-mcp). 팀·repo 생성, 조장 maintainer, 마감 잠금·풀기, 멘토·심사위원 읽기 권한, 앱 설치 요청 판정, 일정 토글 | TypeScript, Node.js 22+, MCP SDK, zod, Octokit, node:sqlite |
 | [`config`](config) | 대회 설정 양식, 앱 정책, 팀 README 양식, 환경 변수 목록 | YAML |
 | [`docs`](docs) | 그림과 문서 | |
 
 ## 빠른 시작
 
-1. **신청 받기**: [`packages/forms`](packages/forms#설치)대로 시트에 Apps Script를 붙이고, `site/`를 GitHub Pages에 올립니다. 질문은 `Config.gs`에서 고칩니다.
+1. **신청 받기**: [`packages/forms`](packages/forms#설치)대로 시트에 Apps Script를 붙이고, `site/`를 GitHub Pages에 올립니다. 질문·모집 기간은 `Config.gs`, 대회 이름·안내 글은 `site/config.js`에서 고칩니다.
 2. **MCP 연결**: GitHub App을 만들어 대회 org에 설치하고, Claude Code나 Claude Desktop에 서버를 등록합니다.
    ```bash
    claude mcp add simple-hackathon-ops --scope user \
@@ -47,7 +47,7 @@
 
 ```bash
 npm install          # 저장소 루트에서 (npm workspaces)
-npm test             # MCP 66개 + 폼 12개 테스트
+npm test             # MCP 66개 + 폼 17개 테스트
 npm run typecheck
 npm run build
 npm run smoke        # 빌드된 MCP 서버를 실제 MCP 클라이언트로 띄워 확인
@@ -57,7 +57,7 @@ npm run smoke        # 빌드된 MCP 서버를 실제 MCP 클라이언트로 띄
 .
 ├── packages/
 │   ├── mcp/        MCP 서버 (npm: simple-hackathon-ops-mcp)
-│   └── forms/      신청 폼: site/ (GitHub Pages) + apps-script/ (Apps Script)
+│   └── forms/      신청 페이지: site/ (GitHub Pages) + apps-script/ (Apps Script)
 ├── config/         설정 양식 (event.example.yaml, app-policy.yaml, …)
 ├── docs/           그림
 └── workspace/      내 대회 설정과 기록 (git 제외)

@@ -9,11 +9,14 @@
  *   ALLOWED_DOMAIN  e.g. "example.ac.kr" to accept only that Google Workspace domain. Optional.
  */
 
+/**
+ * Texts that sit next to the form. Everything else on the page (event name, steps, notices, footer)
+ * is in the site's config.js.
+ */
 var EVENT = {
-  /** Shown at the top of the form. */
-  title: 'My Hackathon 2026 — 참가 신청',
-  intro: '구글 계정으로 로그인한 뒤 작성해 주세요. 제출한 내용은 마감 전까지 다시 열어 고칠 수 있습니다.',
-  /** Privacy notice shown above the submit button. Keep it short; link to your full policy. */
+  /** Under "구글 계정으로 시작하기", before sign-in. */
+  intro: '신청자 확인과 중복 제출 방지를 위해 로그인이 필요합니다. 제출한 내용은 마감 전까지 다시 열어 고칠 수 있습니다.',
+  /** Next to the submit button when the site has no terms/privacy links (config.js LEGAL). Keep it short. */
   privacy: '입력하신 정보는 대회 운영에만 쓰이며 대회 종료 후 파기됩니다.',
   privacyUrl: ''
 };
@@ -38,6 +41,9 @@ var SHEET = {
  * The questions. Each field's `key` is its column in the sheet. The MCP server's event.yaml maps
  * columns by these names (roster.columns), so keep 성함 / GitHub 아이디 or change both sides.
  *
+ * Section: name, hint (shown inside, \n = new line, URLs become links), optional, summary
+ *          (grey text on the closed header; default: the field names, or "중복 선택 가능"), fields.
+ *
  * type     text | tel | textarea | single | multi | github
  * required true makes it mandatory
  * options  choices for single / multi
@@ -49,6 +55,7 @@ var SHEET = {
 var FORM = [
   {
     name: '기본 정보',
+    summary: '성함 · 연락처 · 학번 · 학년',
     fields: [
       { key: '성함', type: 'text', required: true, placeholder: '홍길동' },
       { key: '연락처', type: 'tel', required: true, placeholder: '010-0000-0000' },
