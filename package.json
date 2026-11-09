@@ -32,6 +32,14 @@
     "google-sheets"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/forreal03/SimpleHackathon-ops-mcp.git"
+  },
+  "homepage": "https://github.com/forreal03/SimpleHackathon-ops-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/forreal03/SimpleHackathon-ops-mcp/issues"
+  },
   "engines": {
     "node": ">=22.13"
   },

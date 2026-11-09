@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { Octokit } from "@octokit/rest";
 import { createAppAuth } from "@octokit/auth-app";
@@ -83,11 +84,20 @@ async function connect(org: string): Promise<OctokitGh> {
     return new OctokitGh(kit, org, "app", installation.permissions);
   }
 
-  if (process.env.GITHUB_TOKEN) {
-    return new OctokitGh(new Kit({ auth: process.env.GITHUB_TOKEN, throttle, userAgent, log }), org, "token", null);
+  let token = process.env.GITHUB_TOKEN;
+  // For trying things out: borrow the GitHub CLI's login instead of writing a token into a config file.
+  if (!token && process.env.HACKATHON_OPS_GITHUB_FROM_GH === "1") {
+    try {
+      token = execFileSync("gh", ["auth", "token"], { encoding: "utf8", timeout: 15_000 }).trim();
+    } catch {
+      throw new UserError("HACKATHON_OPS_GITHUB_FROM_GH=1 but `gh auth token` failed. Run `gh auth login` first.");
+    }
+  }
+  if (token) {
+    return new OctokitGh(new Kit({ auth: token, throttle, userAgent, log }), org, "token", null);
   }
 
-  throw new UserError("No GitHub credentials. Set GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY_PATH (or GITHUB_TOKEN for testing).");
+  throw new UserError("No GitHub credentials. Set GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY_PATH (or GITHUB_TOKEN / HACKATHON_OPS_GITHUB_FROM_GH=1 for testing).");
 }
 
 const emailKey = (email: string) => "email:" + createHash("sha256").update(email.toLowerCase()).digest("hex").slice(0, 10);

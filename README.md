@@ -1,4 +1,4 @@
-# hackathon-ops-mcp
+# SimpleHackathon-ops-mcp
 
 해커톤을 GitHub에서 운영할 때 반복되는 일을 Claude 같은 MCP 클라이언트에게 말로 시키는 MCP 서버입니다.
 
@@ -37,7 +37,7 @@
 상태 저장에 Node 내장 `node:sqlite`를 씁니다(네이티브 빌드 없음).
 
 ```bash
-git clone <this repo> && cd hackathon-ops-mcp
+git clone https://github.com/forreal03/SimpleHackathon-ops-mcp.git && cd SimpleHackathon-ops-mcp
 npm install
 npm run build
 ```
@@ -67,7 +67,7 @@ GitHub → Settings → Developer settings → GitHub Apps → New GitHub App
 
 MCP 서버 자체는 org에 등록하지 않습니다. 서버는 운영진 PC에서 돌고(아래 4번), org에는 이 GitHub App만 설치합니다.
 
-시험해 볼 때는 GitHub App 대신 `GITHUB_TOKEN`(테스트 org의 owner 토큰)도 됩니다.
+시험해 볼 때는 GitHub App 대신 `GITHUB_TOKEN`(테스트 org의 owner 토큰)도 됩니다. GitHub CLI에 로그인돼 있다면 `HACKATHON_OPS_GITHUB_FROM_GH=1`로 `gh auth token`을 빌려 쓸 수 있어, 설정 파일에 토큰을 적지 않아도 됩니다.
 
 ### 3. 명단 시트 지정과 Google 인증
 
