@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600" width="960" height="600" role="img" aria-labelledby="t d" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title id="t">SimpleHackathon-ops architecture and stack</title>
+  <desc id="d">Participants apply through a static form page backed by Google Apps Script, which writes to Google Sheets. Operators ask Claude, which calls the simple-hackathon-ops MCP server; the server reads the roster read-only and manages the GitHub organization through a GitHub App.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#7a8292"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="600" rx="16" fill="#ffffff"/>
+  <text x="32" y="44" font-size="20" font-weight="700" fill="#16181d">SimpleHackathon-ops</text>
+  <text x="32" y="68" font-size="13" fill="#5b6270">Participants apply on a form; operators run the GitHub org by asking Claude. Every GitHub change is plan → confirm → apply.</text>
+
+  <!-- lanes -->
+  <text x="32" y="104" font-size="12" font-weight="700" fill="#5b6270" letter-spacing="1">PARTICIPANTS · packages/forms</text>
+  <text x="636" y="104" font-size="12" font-weight="700" fill="#5b6270" letter-spacing="1">OPERATORS · packages/mcp</text>
+
+  <!-- connectors -->
+  <g fill="none" stroke="#7a8292" stroke-width="1.5">
+    <path d="M182 168V196" marker-end="url(#arrow)"/>
+    <path d="M182 268V296" marker-end="url(#arrow)"/>
+    <path d="M182 368V512H340" marker-end="url(#arrow)"/>
+    <path d="M786 168V196" marker-end="url(#arrow)"/>
+    <path d="M786 268V296" marker-end="url(#arrow)"/>
+    <path d="M786 392V472" marker-end="url(#arrow)"/>
+    <path d="M600 232H636" marker-end="url(#arrow)"/>
+    <path d="M480 480V344H636" marker-end="url(#arrow)"/>
+  </g>
+  <text x="194" y="187" font-size="12" fill="#5b6270">fills in</text>
+  <text x="194" y="287" font-size="12" fill="#5b6270">answers + Google ID token</text>
+  <text x="194" y="530" font-size="12" fill="#5b6270">one row per person</text>
+  <text x="798" y="187" font-size="12" fill="#5b6270">asks in plain words</text>
+  <text x="798" y="287" font-size="12" fill="#5b6270">MCP tools over stdio</text>
+  <text x="798" y="436" font-size="12" fill="#5b6270">plan → confirm → apply</text>
+  <text x="492" y="364" font-size="12" fill="#5b6270">reads the roster</text>
+  <text x="492" y="380" font-size="12" fill="#5b6270">(read-only)</text>
+
+  <!-- participants -->
+  <g>
+    <rect x="32" y="120" width="300" height="48" rx="10" fill="#f7f8fa" stroke="#c9ced8"/>
+    <text x="182" y="149" font-size="14" font-weight="600" fill="#16181d" text-anchor="middle">Participant (browser)</text>
+  </g>
+  <g>
+    <rect x="32" y="200" width="300" height="68" rx="10" fill="#f7f8fa" stroke="#c9ced8"/>
+    <text x="48" y="226" font-size="14" font-weight="600" fill="#16181d">Application form · site/</text>
+    <text x="48" y="246" font-size="12" fill="#5b6270">HTML · CSS · vanilla JS, no build step</text>
+    <text x="48" y="262" font-size="12" fill="#5b6270">GitHub Pages · Google sign-in (GIS)</text>
+  </g>
+  <g>
+    <rect x="32" y="300" width="300" height="68" rx="10" fill="#f7f8fa" stroke="#c9ced8"/>
+    <text x="48" y="326" font-size="14" font-weight="600" fill="#16181d">Form backend · apps-script/</text>
+    <text x="48" y="346" font-size="12" fill="#5b6270">Google Apps Script (V8) web app</text>
+    <text x="48" y="362" font-size="12" fill="#5b6270">verifies token · checks period and answers</text>
+  </g>
+
+  <!-- middle -->
+  <g>
+    <rect x="360" y="200" width="240" height="64" rx="10" fill="#f7f8fa" stroke="#c9ced8"/>
+    <text x="376" y="226" font-size="14" font-weight="600" fill="#16181d">Gmail (Claude connector)</text>
+    <text x="376" y="246" font-size="12" fill="#5b6270">"Request to install &lt;app&gt;" emails</text>
+  </g>
+  <g>
+    <rect x="344" y="480" width="272" height="64" rx="10" fill="#f7f8fa" stroke="#c9ced8"/>
+    <text x="360" y="506" font-size="14" font-weight="600" fill="#16181d">Google Sheets (roster)</text>
+    <text x="360" y="526" font-size="12" fill="#5b6270">or CSV files on the operator's computer</text>
+  </g>
+
+  <!-- operators -->
+  <g>
+    <rect x="636" y="120" width="300" height="48" rx="10" fill="#f7f8fa" stroke="#c9ced8"/>
+    <text x="786" y="149" font-size="14" font-weight="600" fill="#16181d" text-anchor="middle">Operator</text>
+  </g>
+  <g>
+    <rect x="636" y="200" width="300" height="68" rx="10" fill="#f7f8fa" stroke="#c9ced8"/>
+    <text x="652" y="226" font-size="14" font-weight="600" fill="#16181d">Claude Code / Claude Desktop</text>
+    <text x="652" y="246" font-size="12" fill="#5b6270">MCP client · shows each plan and asks</text>
+    <text x="652" y="262" font-size="12" fill="#5b6270">before anything changes</text>
+  </g>
+  <g>
+    <rect x="636" y="300" width="300" height="92" rx="10" fill="#eef3ff" stroke="#2f5bd3" stroke-width="2"/>
+    <text x="652" y="326" font-size="14" font-weight="700" fill="#16181d">simple-hackathon-ops-mcp</text>
+    <text x="652" y="346" font-size="12" fill="#3d4452">TypeScript · Node.js 22+ · MCP SDK · zod</text>
+    <text x="652" y="362" font-size="12" fill="#3d4452">Octokit (GitHub App) · node:sqlite state</text>
+    <text x="652" y="378" font-size="12" fill="#3d4452">audit log · read-only Sheets access</text>
+  </g>
+  <g>
+    <rect x="636" y="476" width="300" height="68" rx="10" fill="#f7f8fa" stroke="#c9ced8"/>
+    <text x="652" y="502" font-size="14" font-weight="600" fill="#16181d">GitHub organization</text>
+    <text x="652" y="522" font-size="12" fill="#5b6270">teams · repos · deadline locks · reviewers</text>
+    <text x="652" y="538" font-size="12" fill="#5b6270">third-party app review</text>
+  </g>
+
+  <text x="32" y="582" font-size="12" fill="#5b6270">Tested with Vitest (MCP server with an in-memory GitHub, Apps Script in a sandbox, the page in jsdom) · CI on Node 22 and 24</text>
+</svg>

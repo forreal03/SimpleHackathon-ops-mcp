@@ -1,0 +1,14 @@
+{
+  "name": "@simple-hackathon-ops/forms",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Hackathon application form: a static page (GitHub Pages) and a Google Apps Script backend that writes to Google Sheets.",
+  "license": "MIT",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "jsdom": "^26.1.0",
+    "vitest": "^5.1.0"
+  }
+}

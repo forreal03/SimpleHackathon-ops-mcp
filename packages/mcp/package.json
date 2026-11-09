@@ -1,0 +1,68 @@
+{
+  "name": "simple-hackathon-ops-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for running a hackathon on GitHub: teams and repos from a roster, deadline lock and unlock, read-only mentor/judge access, third-party app review from GitHub's emails, and schedule toggles.",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "simple-hackathon-ops-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "config",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-config.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "smoke": "node scripts/smoke.mjs",
+    "prepack": "npm run build"
+  },
+  "keywords": [
+    "claude",
+    "github",
+    "github-app",
+    "github-teams",
+    "google-sheets",
+    "hackathon",
+    "hackathon-ops",
+    "mcp",
+    "model-context-protocol"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/forreal03/SimpleHackathon-ops-mcp.git",
+    "directory": "packages/mcp"
+  },
+  "homepage": "https://github.com/forreal03/SimpleHackathon-ops-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/forreal03/SimpleHackathon-ops-mcp/issues"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@octokit/auth-app": "^8.3.1",
+    "@octokit/plugin-retry": "^8.1.1",
+    "@octokit/plugin-throttling": "^11.0.5",
+    "@octokit/rest": "^22.0.1",
+    "google-auth-library": "^11.3.3",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^5.1.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

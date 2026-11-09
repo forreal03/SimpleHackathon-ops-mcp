@@ -1,6 +1,8 @@
 node_modules/
 dist/
 coverage/
+*.log
+.DS_Store
 
 # Credentials — never commit
 .env
@@ -9,11 +11,10 @@ coverage/
 service-account*.json
 credentials*.json
 
-# Per-event config and state hold sheet IDs and personal data.
-# Only the example event is tracked.
-events/*
-!events/example/
-events/example/state.db*
+# Your real events: config, sheet ids, state.db with personal data.
+# Point HACKATHON_OPS_HOME here (or anywhere outside the repo).
+workspace/
 
-*.log
-.DS_Store
+# Build output copied into the npm package
+packages/mcp/config/
+packages/mcp/LICENSE
